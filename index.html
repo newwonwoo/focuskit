@@ -13,6 +13,7 @@
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
   import { getFirestore, doc, setDoc, getDoc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+  import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyA0UqHP0P50FjWss90GEnVdNkJD4ZyRbwk",
@@ -25,9 +26,12 @@
 
   const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
+  const messaging = getMessaging(app);
+
+  const VAPID_KEY = 'BM6itY3p20KsyyIoZ_KwDYh94TwpoMOzZ_PtSzxfm6agU-xU3TfQ9IZweY9NUs0NhrkIu97CosOxQfd2BjhxqeU';
 
   // ── Firebase 저장/불러오기 헬퍼 ──
-  const FAMILY_ID = 'family'; // 가족 공유 ID (고정)
+  const FAMILY_ID = 'family';
 
   async function fbSave(key, data) {
     try {
@@ -51,13 +55,47 @@
     });
   }
 
+  // FCM 토큰 등록
+  async function registerFCM(username) {
+    try {
+      const sw = await navigator.serviceWorker.ready;
+      const token = await getToken(messaging, { vapidKey: VAPID_KEY, serviceWorkerRegistration: sw });
+      if (token) {
+        await fbSave('fk_fcm_' + (username || 'user'), token);
+        console.log('FCM token saved:', token);
+      }
+      return token;
+    } catch(e) {
+      console.warn('FCM 등록 실패', e);
+      return null;
+    }
+  }
+
+  // 포그라운드 메시지 수신
+  onMessage(messaging, (payload) => {
+    console.log('포그라운드 메시지:', payload);
+    const { title, body } = payload.notification || {};
+    if (title) {
+      new Notification(title, { body, icon: '/icon.png', tag: 'focuskit' });
+      // 소리
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.frequency.value = 880; gain.gain.value = 0.3;
+        osc.start(); osc.stop(ctx.currentTime + 0.15);
+      } catch(e) {}
+    }
+  });
+
   // 전역으로 노출
   window.fbSave  = fbSave;
   window.fbLoad  = fbLoad;
   window.fbListen = fbListen;
+  window.registerFCM = registerFCM;
   window.fbReady = true;
 
-  // 초기화 완료 알림
   window.dispatchEvent(new Event('fb-ready'));
 </script>
 <style>
@@ -410,7 +448,6 @@
   ════════════════════════════════ -->
   <div id="tab-pomo" class="tab fadeIn">
     <div id="pomo-wrap">
-      <!-- 타이머 카드 -->
       <div class="card">
         <div class="stitle">🍅 포모도로 타이머</div>
         <div id="pomo-modes">
@@ -439,7 +476,6 @@
           <button id="pomo-custom-set" onclick="pomoCustom()">설정</button>
         </div>
       </div>
-      <!-- 통계 카드 -->
       <div class="card">
         <div class="stitle">📊 집중 통계</div>
         <div id="pomo-stats-grid">
@@ -464,7 +500,6 @@
        SHOP TAB
   ════════════════════════════════ -->
   <div id="tab-shop" class="tab fadeIn">
-    <!-- 검색 바 -->
     <div class="card" style="margin-bottom:14px">
       <div class="stitle">🛒 관심 품목 · 핫딜 검색</div>
       <div style="display:flex;gap:10px;margin-bottom:12px">
@@ -477,22 +512,14 @@
         <button onclick="shopOpen('coupang', $('shop-search-inp').value)" style="flex:1;min-width:120px;background:#E74C3C;border:none;border-radius:12px;padding:14px;color:#fff;font-size:17px;font-weight:700;cursor:pointer">🔴 쿠팡</button>
       </div>
     </div>
-
-    <!-- 관심 품목 목록 -->
     <div class="card">
       <div class="stitle" style="margin-bottom:14px">⭐ 관심 품목 등록</div>
-
-      <!-- 추가 폼 -->
       <div style="display:flex;gap:10px;margin-bottom:6px">
         <input id="shop-item-inp" class="inp" placeholder="품목명 (예: 유기농 사과 주스)" style="flex:1;font-size:18px" onkeydown="if(event.key==='Enter')shopAddItem()">
         <button class="btn-primary" onclick="shopAddItem()">추가</button>
       </div>
       <div style="font-size:14px;color:var(--text2);margin-bottom:18px">💡 등록하면 버튼 하나로 네이버·구글·쿠팡 동시 검색!</div>
-
-      <!-- 품목 리스트 -->
       <div id="shop-list"></div>
-
-      <!-- 빠른 추가 태그 -->
       <div style="margin-top:18px">
         <div style="font-size:14px;color:var(--text2);margin-bottom:10px;font-weight:600">자주 찾는 카테고리</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap" id="shop-quick-tags"></div>
@@ -506,7 +533,6 @@
   <div id="tab-note" class="tab fadeIn">
     <div class="card" style="padding:0;overflow:hidden">
       <div id="note-wrap">
-        <!-- 사이드바 -->
         <div id="note-sidebar">
           <div id="note-sidebar-top">
             <div class="stitle" style="margin-bottom:10px">📝 노트</div>
@@ -517,7 +543,6 @@
             <button id="note-add-btn" onclick="noteStartNew()">＋ 새 노트</button>
           </div>
         </div>
-        <!-- 에디터 -->
         <div id="note-editor">
           <div id="note-new-form" style="display:none;margin-bottom:16px;padding:16px;background:var(--bg);border-radius:12px;border:1.5px solid var(--accent);">
             <div style="font-size:14px;color:var(--accent);font-weight:600;margin-bottom:10px">새 노트</div>
@@ -584,6 +609,8 @@
       <input id="notif-username" class="inp" placeholder="이름 입력 (예: 홍길동)" style="font-size:18px">
     </div>
 
+    <div id="notif-status" style="font-size:14px;color:var(--text2);margin-bottom:16px;min-height:20px"></div>
+
     <div style="display:flex;gap:10px">
       <button class="btn-primary" style="flex:1;font-size:18px" onclick="saveNotifSettings()">저장</button>
       <button class="btn-ghost" style="font-size:18px" onclick="closeNotifSettings()">닫기</button>
@@ -611,9 +638,6 @@
 </div>
 
 <script>
-// ════════════════════════════════════════════════════════
-//  유틸
-// ════════════════════════════════════════════════════════
 const today = () => new Date().toISOString().slice(0, 10);
 const dateKey = (offset = 0) => { const d = new Date(); d.setDate(d.getDate() + offset); return d.toISOString().slice(0, 10); };
 const dayLabel = (iso) => { const [, m, d] = iso.split('-'); return `${m}/${d}`; };
@@ -622,12 +646,11 @@ const getDOW = (iso) => WEEKDAYS[new Date(iso).getDay()];
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
-// ── Firebase 래퍼 (fallback: localStorage) ──
 const lsLoad = (k, d) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } };
 const lsSave = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
 
 async function dbSave(key, data) {
-  lsSave(key, data); // 오프라인 fallback
+  lsSave(key, data);
   if (window.fbReady) await window.fbSave(key, data);
 }
 
@@ -644,7 +667,7 @@ function dbListen(key, cb) {
 }
 
 // ════════════════════════════════════════════════════════
-//  푸시 알림
+//  푸시 알림 (FCM)
 // ════════════════════════════════════════════════════════
 let notifSettings = lsLoad('fk_notif', { enabled: false, type: 'sound', username: '' });
 let myUsername = notifSettings.username || '';
@@ -658,6 +681,7 @@ function openNotifSettings() {
   const typeEl = document.querySelector(`input[name="notif-type"][value="${notifSettings.type || 'sound'}"]`);
   if (typeEl) typeEl.checked = true;
   updateNotifSlider(notifSettings.enabled);
+  $('notif-status').textContent = notifSettings.enabled ? '✅ 알림 활성화됨' : '';
 }
 function closeNotifSettings() { $('notif-modal').style.display = 'none'; }
 
@@ -668,32 +692,51 @@ function updateNotifSlider(on) {
   knob.style.transform = on ? 'translateX(24px)' : 'translateX(0)';
 }
 
-function toggleNotif(on) {
+async function toggleNotif(on) {
   updateNotifSlider(on);
-  if (on && Notification.permission === 'default') {
-    Notification.requestPermission().then(p => {
-      if (p !== 'granted') { $('notif-toggle').checked = false; updateNotifSlider(false); alert('알림 권한이 필요해요. 브라우저 설정에서 허용해주세요!'); }
-    });
+  if (on) {
+    $('notif-status').textContent = '⏳ 권한 요청 중...';
+    const permission = await Notification.requestPermission();
+    if (permission !== 'granted') {
+      $('notif-toggle').checked = false;
+      updateNotifSlider(false);
+      $('notif-status').textContent = '❌ 알림 권한이 거부되었어요. 브라우저 설정에서 허용해주세요!';
+      return;
+    }
+    $('notif-status').textContent = '⏳ FCM 등록 중...';
+    try {
+      const username = $('notif-username').value.trim() || 'user';
+      const token = await window.registerFCM(username);
+      if (token) {
+        $('notif-status').textContent = '✅ 푸시 알림 등록 완료!';
+      } else {
+        $('notif-status').textContent = '⚠️ FCM 등록 실패. 브라우저가 지원하지 않을 수 있어요.';
+      }
+    } catch(e) {
+      $('notif-status').textContent = '⚠️ FCM 등록 중 오류: ' + e.message;
+    }
+  } else {
+    $('notif-status').textContent = '';
   }
 }
 
-function saveNotifSettings() {
+async function saveNotifSettings() {
   const username = $('notif-username').value.trim();
   const type = document.querySelector('input[name="notif-type"]:checked')?.value || 'sound';
   const enabled = $('notif-toggle').checked;
   notifSettings = { enabled, type, username };
   myUsername = username;
   lsSave('fk_notif', notifSettings);
+  if (enabled && username && window.registerFCM) {
+    await window.registerFCM(username);
+  }
   closeNotifSettings();
-  if (enabled) alert('✅ 알림이 설정되었어요!\n다른 사람이 항목을 추가하면 알려드릴게요.');
 }
 
 function sendNotif(title, body) {
   if (!notifSettings.enabled) return;
   if (Notification.permission !== 'granted') return;
-
   new Notification(title, { body, icon: '📋', badge: '📋', tag: 'focuskit' });
-
   if (notifSettings.type === 'vibrate' && navigator.vibrate) {
     navigator.vibrate([200, 100, 200]);
   } else if (notifSettings.type === 'sound') {
@@ -711,10 +754,8 @@ function sendNotif(title, body) {
 function checkAndNotify(key, newData, label) {
   if (!notifInitialized) return;
   if (!notifSettings.enabled) return;
-
   const newCount = newData.length;
   const oldCount = lastKnownCounts[key] || 0;
-
   if (newCount > oldCount) {
     const newest = newData[0];
     const addedBy = newest?.addedBy || '상대방';
@@ -735,7 +776,6 @@ function noteCancelNew() {
   $('note-new-title').value = '';
 }
 
-// 동기 연결 표시
 function showSyncStatus(ok) {
   const el = $('sync-status');
   if (!el) return;
@@ -743,10 +783,8 @@ function showSyncStatus(ok) {
   el.style.color = ok ? 'var(--green)' : 'var(--text3)';
 }
 
-// 헤더 날짜
 $('header-date').textContent = new Date().toLocaleDateString('ko-KR', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
 
-// 탭 전환
 function showTab(name) {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
@@ -808,8 +846,6 @@ function todoRender() {
   const total = tasks.length;
   const done = tasks.filter(t => t.done).length;
   const high = tasks.filter(t => t.priority === 'high' && !t.done).length;
-
-  // 통계 알약
   const stats = $('todo-stats');
   stats.innerHTML = `
     <span class="pill" style="background:rgba(59,130,246,.18);color:var(--accent);border:1px solid rgba(59,130,246,.3)">${total} 전체</span>
@@ -817,22 +853,16 @@ function todoRender() {
     ${high > 0 ? `<span class="pill" style="background:rgba(239,68,68,.15);color:var(--red);border:1px solid rgba(239,68,68,.25)">${high} 긴급</span>` : ''}
     ${total > 0 ? `<span class="pill" style="background:rgba(255,255,255,.06);color:var(--text2);border:1px solid var(--border)">${Math.round(done/total*100)}%</span>` : ''}
   `;
-
-  // 진행 바
   $('todo-progress-bar').style.width = total > 0 ? `${Math.round(done/total*100)}%` : '0';
-
-  // 필터
   let filtered = tasks;
   if (todoCurrentFilter === 'active') filtered = tasks.filter(t => !t.done);
   else if (todoCurrentFilter === 'done') filtered = tasks.filter(t => t.done);
   else if (todoCurrentFilter === 'high') filtered = tasks.filter(t => t.priority === 'high');
-
   const list = $('todo-list');
   if (filtered.length === 0) {
     list.innerHTML = `<div class="empty-msg">${todoCurrentFilter === 'done' ? '완료된 항목 없음' : '할 일을 추가해보세요 ✨'}</div>`;
     return;
   }
-
   list.innerHTML = filtered.map(task => {
     const pc = PRIO_COLOR[task.priority] || 'var(--accent)';
     const isEdit = todoEditId === task.id;
@@ -882,7 +912,6 @@ function habitToggle(id, date) {
   habitLogs[key] = !habitLogs[key];
   habitSaveLogs(); habitRender();
 }
-
 function habitAdd() {
   const name = $('habit-new-name').value.trim();
   if (!name) return;
@@ -890,14 +919,11 @@ function habitAdd() {
   $('habit-new-name').value = '';
   habitSave(); habitRender();
 }
-
 function habitDelete(id) {
   habits = habits.filter(h => h.id !== id);
   habitSave(); habitRender();
 }
-
 function habitIsDone(id, date) { return !!habitLogs[`${id}_${date}`]; }
-
 function habitStreak(id) {
   let s = 0;
   for (let i = 0; i >= -90; i--) {
@@ -905,34 +931,23 @@ function habitStreak(id) {
   }
   return s;
 }
-
 function habitSelectIcon(ic) {
   habitSelectedIcon = ic;
-  document.querySelectorAll('.icon-pick').forEach(b => {
-    b.classList.toggle('sel', b.dataset.ic === ic);
-  });
+  document.querySelectorAll('.icon-pick').forEach(b => b.classList.toggle('sel', b.dataset.ic === ic));
 }
-
 function habitSelectColor(c) {
   habitSelectedColor = c;
-  document.querySelectorAll('.color-pick').forEach(b => {
-    b.classList.toggle('sel', b.dataset.c === c);
-  });
+  document.querySelectorAll('.color-pick').forEach(b => b.classList.toggle('sel', b.dataset.c === c));
 }
-
 function habitRender() {
   const days = Array.from({ length: 7 }, (_, i) => dateKey(i - 6));
   const todayStr = today();
-
-  // 날짜 헤더
   $('habit-date-header').innerHTML = days.map(d => `
     <div class="habit-day-col">
       <div class="habit-day-label ${d === todayStr ? 'today-col' : ''}">${getDOW(d)}</div>
       <div class="habit-day-label ${d === todayStr ? 'today-col' : ''}">${dayLabel(d)}</div>
     </div>
   `).join('');
-
-  // 습관 행
   $('habit-rows').innerHTML = habits.map(h => {
     const streak = habitStreak(h.id);
     const weekDone = days.filter(d => habitIsDone(h.id, d)).length;
@@ -960,13 +975,9 @@ function habitRender() {
       </div>
     `;
   }).join('');
-
-  // 아이콘 선택기
   $('habit-icons').innerHTML = HABIT_ICONS.map(ic =>
     `<button class="icon-pick ${ic === habitSelectedIcon ? 'sel' : ''}" data-ic="${ic}" onclick="habitSelectIcon('${ic}')">${ic}</button>`
   ).join('');
-
-  // 색상 선택기
   $('habit-colors').innerHTML = HABIT_COLORS.map(c =>
     `<div class="color-pick ${c === habitSelectedColor ? 'sel' : ''}" data-c="${c}" style="background:${c}" onclick="habitSelectColor('${c}')"></div>`
   ).join('');
@@ -998,14 +1009,12 @@ function pomoSetArc() {
   arc.setAttribute('stroke', mode.color);
   $('pomo-start').style.background = mode.color;
 }
-
 function pomoUpdateDisplay() {
   const mm = String(Math.floor(pomoLeftSec / 60)).padStart(2, '0');
   const ss = String(pomoLeftSec % 60).padStart(2, '0');
   $('pomo-timer-text').textContent = `${mm}:${ss}`;
   pomoSetArc();
 }
-
 function pomoMode(i, btn) {
   clearInterval(pomoTimer); pomoRunning = false;
   pomoModeIdx = i;
@@ -1021,7 +1030,6 @@ function pomoMode(i, btn) {
   });
   pomoUpdateDisplay();
 }
-
 function pomoToggle() {
   if (pomoRunning) {
     clearInterval(pomoTimer); pomoRunning = false;
@@ -1038,6 +1046,7 @@ function pomoToggle() {
           pomoSessions = [{ date: today(), ts: Date.now() }, ...pomoSessions].slice(0, 300);
           dbSave('fk_pomo', pomoSessions);
           pomoRenderStats();
+          sendNotif('🍅 포모도로 완료!', '집중 세션이 끝났어요. 잠깐 쉬어요!');
         }
         pomoLeftSec = 0;
       }
@@ -1045,14 +1054,12 @@ function pomoToggle() {
     }, 1000);
   }
 }
-
 function pomoReset() {
   clearInterval(pomoTimer); pomoRunning = false;
   pomoLeftSec = pomoTotalSec;
   $('pomo-start').textContent = '▶ 시작';
   pomoUpdateDisplay();
 }
-
 function pomoCustom() {
   const m = parseInt($('pomo-custom-inp').value);
   if (m > 0 && m <= 120) {
@@ -1063,7 +1070,6 @@ function pomoCustom() {
     pomoUpdateDisplay();
   }
 }
-
 function pomoRenderStats() {
   const todaySessions = pomoSessions.filter(s => s.date === today()).length;
   const last7 = Array.from({ length: 7 }, (_, i) => {
@@ -1077,13 +1083,11 @@ function pomoRenderStats() {
   $('pomo-week-min').textContent  = `${weekTotal * 25}분`;
   pomoRenderBars(last7);
 }
-
 function pomoRenderBars(last7arg) {
   const last7 = last7arg || Array.from({ length: 7 }, (_, i) => {
     const k = dateKey(i - 6);
     return { date: k, count: pomoSessions.filter(s => s.date === k).length };
   });
-  const maxCount = Math.max(...last7.map(d => d.count), 1);
   const todayStr = today();
   $('pomo-bar-wrap').innerHTML = last7.map(({ date, count }) => {
     const h = count === 0 ? 4 : Math.min(4 + count * 12, 52);
@@ -1107,7 +1111,6 @@ let notes = [];
 let noteSelected = null;
 
 function noteSave() { dbSave('fk_notes', notes); }
-
 function noteAdd() {
   const title = $('note-new-title').value.trim();
   if (!title) return;
@@ -1184,16 +1187,13 @@ function shopOpen(site, query) {
   };
   window.open(urls[site], '_blank');
 }
-
 function shopSearchAll() {
   const q = $('shop-search-inp').value.trim();
   if (!q) { alert('검색어를 입력해주세요!'); return; }
-  // 약간의 딜레이로 팝업 차단 방지
   ['naver','google','coupang'].forEach((site, i) => {
     setTimeout(() => shopOpen(site, q), i * 300);
   });
 }
-
 function shopAddItem() {
   const name = $('shop-item-inp').value.trim();
   if (!name) return;
@@ -1203,24 +1203,20 @@ function shopAddItem() {
   lsSave('fk_shop', shopItems);
   shopRender();
 }
-
 function shopDeleteItem(id) {
   shopItems = shopItems.filter(i => i.id !== id);
   lsSave('fk_shop', shopItems);
   shopRender();
 }
-
 function shopSearchItem(name) {
   $('shop-search-inp').value = name;
   ['naver','google','coupang'].forEach((site, i) => {
     setTimeout(() => shopOpen(site, name), i * 300);
   });
 }
-
 function shopRender() {
   const list = $('shop-list');
   if (!list) return;
-
   if (shopItems.length === 0) {
     list.innerHTML = `<div style="text-align:center;padding:30px;color:var(--text2);font-size:18px">관심 품목을 추가해보세요!</div>`;
   } else {
@@ -1240,8 +1236,6 @@ function shopRender() {
       </div>
     `).join('');
   }
-
-  // 퀵 태그
   const tags = $('shop-quick-tags');
   if (tags) {
     tags.innerHTML = SHOP_QUICK.map(tag => `
@@ -1249,8 +1243,8 @@ function shopRender() {
     `).join('');
   }
 }
+
 async function initApp() {
-  // 1. Firebase에서 데이터 로드
   const [t, h, hl, p, n] = await Promise.all([
     dbLoad('fk_tasks', []),
     dbLoad('fk_habits', [
@@ -1266,11 +1260,8 @@ async function initApp() {
   ]);
   tasks = t; habits = h; habitLogs = hl; pomoSessions = p; notes = n;
   noteSelected = notes[0]?.id || null;
-
-  // 초기 카운트 세팅
   lastKnownCounts = { tasks: tasks.length, notes: notes.length, habits: habits.length };
 
-  // 2. 첫 렌더
   todoRender(); habitRender();
   pomoUpdateDisplay();
   pomoMode(0, document.querySelector('.pomo-mode-btn'));
@@ -1279,10 +1270,8 @@ async function initApp() {
   showSyncStatus(window.fbReady);
   shopRender();
 
-  // 알림 초기화 완료 (이제부터 변화 감지)
   setTimeout(() => { notifInitialized = true; }, 2000);
 
-  // 3. 실시간 리스너 — 다른 기기에서 바꾸면 자동 반영 + 알림
   dbListen('fk_tasks', v => {
     checkAndNotify('tasks', v, '할 일');
     tasks = v; todoRender();
@@ -1300,7 +1289,6 @@ async function initApp() {
   });
 }
 
-// 모바일 하단 탭바
 function showTabMobile(name, btn) {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.nav-btn, .bnav-btn').forEach(b => b.classList.remove('active'));
@@ -1313,19 +1301,17 @@ function showTabMobile(name, btn) {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-// Firebase 준비되면 실행, 아니면 바로 실행
 if (window.fbReady) {
   initApp();
 } else {
   window.addEventListener('fb-ready', initApp);
-  // 3초 안에 Firebase 안 되면 로컬로 실행
   setTimeout(() => { if (!window.fbReady) initApp(); }, 3000);
 }
 
-// PWA 서비스워커
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
 }
 </script>
 </body>
 </html>
+
