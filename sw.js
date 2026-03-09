@@ -13,10 +13,16 @@ firebase.initializeApp({
 const messaging = firebase.messaging();
 
 messaging.onBackgroundMessage((payload) => {
-  self.registration.showNotification(payload.notification.title, {
-    body: payload.notification.body,
+  console.log('백그라운드 메시지 수신:', payload);
+  const { title, body } = payload.notification || {};
+  self.registration.showNotification(title || 'FocusKit', {
+    body: body || '',
     icon: '/icon.png',
+    badge: '/icon.png',
     tag: 'focuskit',
     vibrate: [200, 100, 200]
   });
 });
+
+self.addEventListener('install', e => self.skipWaiting());
+self.addEventListener('activate', e => e.waitUntil(clients.claim()));
