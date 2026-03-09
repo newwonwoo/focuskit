@@ -499,6 +499,9 @@
       </div>
     </div>
   </div>
+
+  <!-- ════════════════════════════════
+       NOTE TAB
   ════════════════════════════════ -->
   <div id="tab-note" class="tab fadeIn">
     <div class="card" style="padding:0;overflow:hidden">
@@ -731,6 +734,9 @@ function noteCancelNew() {
   $('note-new-form').style.display = 'none';
   $('note-new-title').value = '';
 }
+
+// 동기 연결 표시
+function showSyncStatus(ok) {
   const el = $('sync-status');
   if (!el) return;
   el.textContent = ok ? '☁️ 실시간 동기화' : '💾 로컬 저장';
