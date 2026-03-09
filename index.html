@@ -1,0 +1,966 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="FocusKit">
+<meta name="theme-color" content="#0f1117">
+<link rel="manifest" href="manifest.json">
+<title>📋 FocusKit</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  :root {
+    --bg: #0f1117;
+    --card: #161b27;
+    --border: #1e2a3a;
+    --accent: #3b82f6;
+    --green: #10b981;
+    --gold: #f59e0b;
+    --red: #ef4444;
+    --cyan: #06b6d4;
+    --purple: #a855f7;
+    --text: #e2e8f0;
+    --text2: #8892a4;
+    --text3: #3d4f63;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; min-height: 100vh; }
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  input, textarea, select { font-family: 'Inter', sans-serif; outline: none; }
+  button { cursor: pointer; font-family: 'Inter', sans-serif; transition: all 0.15s; }
+
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes strikeIn { from { width: 0; } to { width: 100%; } }
+  .fadeIn { animation: fadeIn 0.25s ease; }
+
+  /* ── 레이아웃 ── */
+  #app { max-width: 880px; margin: 0 auto; padding: 18px 20px; }
+
+  /* ── 헤더 ── */
+  .header {
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 14px 22px; margin-bottom: 20px;
+    flex-wrap: wrap; gap: 10px;
+  }
+  .header-title { font-family: 'JetBrains Mono', monospace; font-size: 15px; font-weight: 500; letter-spacing: 1px; }
+  .header-date { font-size: 10px; color: var(--text3); font-family: 'JetBrains Mono', monospace; letter-spacing: 1px; margin-top: 3px; }
+  .nav { display: flex; gap: 3px; }
+  .nav-btn {
+    background: transparent; border: 1px solid transparent;
+    border-radius: 9px; padding: 7px 16px;
+    color: var(--text3); font-size: 12px; font-weight: 400;
+  }
+  .nav-btn.active {
+    background: rgba(59,130,246,.18); border-color: rgba(59,130,246,.35);
+    color: var(--accent); font-weight: 600;
+  }
+
+  /* ── 탭 콘텐츠 ── */
+  .tab { display: none; }
+  .tab.active { display: block; }
+
+  /* ── 카드 ── */
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 18px;
+  }
+  .stitle {
+    font-size: 10px; font-family: 'JetBrains Mono', monospace;
+    color: var(--text3); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 14px;
+  }
+  .pill {
+    display: inline-block;
+    font-size: 10px; font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 1px; padding: 2px 8px; border-radius: 4px;
+    text-transform: uppercase; white-space: nowrap;
+  }
+
+  /* ── 인풋 공통 ── */
+  .inp {
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 9px; padding: 10px 14px;
+    color: var(--text); font-size: 13px; width: 100%;
+    transition: border-color .2s;
+  }
+  .inp:focus { border-color: var(--accent); }
+  .inp::placeholder { color: var(--text3); }
+  .btn-primary {
+    background: var(--accent); border: none; border-radius: 9px;
+    padding: 10px 18px; color: #fff; font-weight: 600; font-size: 13px;
+  }
+  .btn-primary:hover { opacity: .85; }
+  .btn-ghost {
+    background: transparent; border: 1px solid var(--border);
+    border-radius: 9px; padding: 10px 14px;
+    color: var(--text2); font-size: 13px;
+  }
+
+  /* ════════════════════════════════
+     TODO
+  ════════════════════════════════ */
+  #todo-stats { display: flex; gap: 7px; flex-wrap: wrap; margin-bottom: 8px; }
+  #todo-progress { height: 4px; background: var(--border); border-radius: 4px; margin-bottom: 14px; overflow: hidden; }
+  #todo-progress-bar { height: 100%; background: var(--green); border-radius: 4px; transition: width .4s; width: 0; }
+  #todo-input-row { display: flex; gap: 7px; margin-bottom: 10px; }
+  #todo-input { flex: 1; }
+  #todo-priority {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 9px;
+    padding: 10px; color: var(--accent); font-size: 12px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  #todo-filters { display: flex; gap: 5px; margin-bottom: 14px; align-items: center; }
+  .filter-btn {
+    padding: 5px 12px; border-radius: 7px; border: none;
+    font-size: 11px; font-weight: 500;
+    background: transparent; color: var(--text3);
+  }
+  .filter-btn.active {
+    background: rgba(59,130,246,.2); color: var(--accent);
+    outline: 1px solid rgba(59,130,246,.3);
+  }
+  #todo-list { display: flex; flex-direction: column; gap: 6px; max-height: 380px; overflow-y: auto; }
+  .todo-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 11px 13px; border-radius: 9px;
+    background: var(--bg); border: 1px solid var(--border);
+    transition: opacity .2s;
+  }
+  .todo-item.done { opacity: .55; }
+  .todo-check {
+    width: 19px; height: 19px; border-radius: 5px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: all .15s;
+  }
+  .todo-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+  .todo-text { flex: 1; font-size: 13px; }
+  .todo-text.done-text { text-decoration: line-through; color: var(--text3); }
+  .todo-date { font-size: 9px; font-family: 'JetBrains Mono', monospace; color: var(--text3); flex-shrink: 0; }
+  .todo-edit-input {
+    flex: 1; background: var(--card); border: 1px solid var(--accent);
+    border-radius: 6px; padding: 4px 8px; color: var(--text); font-size: 13px;
+  }
+  .icon-btn { background: transparent; border: none; color: var(--text3); font-size: 13px; padding: 2px 6px; }
+  .empty-msg { text-align: center; padding: 32px 0; color: var(--text3); font-size: 13px; }
+
+  /* ════════════════════════════════
+     HABIT
+  ════════════════════════════════ */
+  #habit-date-header { display: flex; margin-bottom: 10px; padding-left: 192px; }
+  .habit-day-col { width: 36px; text-align: center; }
+  .habit-day-label { font-size: 9px; font-family: 'JetBrains Mono', monospace; color: var(--text3); }
+  .habit-day-label.today-col { color: var(--accent); }
+  #habit-rows { display: flex; flex-direction: column; gap: 8px; margin-bottom: 18px; }
+  .habit-row { display: flex; align-items: center; gap: 4px; }
+  .habit-name-cell { width: 188px; display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+  .habit-icon { font-size: 17px; }
+  .habit-info { flex: 1; overflow: hidden; }
+  .habit-name { font-size: 12px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .habit-meta { display: flex; gap: 6px; margin-top: 2px; }
+  .habit-streak { font-size: 9px; font-family: 'JetBrains Mono', monospace; }
+  .habit-cell {
+    width: 34px; height: 34px; border-radius: 8px; cursor: pointer; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; transition: all .15s; border: 1.5px solid var(--border);
+    background: var(--bg); color: transparent;
+  }
+  .habit-cell.done { color: #fff; }
+  #habit-add { border-top: 1px solid var(--border); padding-top: 14px; }
+  #habit-add-row { display: flex; gap: 7px; margin-bottom: 9px; }
+  #habit-new-name { flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; color: var(--text); font-size: 12px; }
+  #habit-icons { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 8px; }
+  .icon-pick {
+    width: 30px; height: 30px; border-radius: 6px; border: 1.5px solid var(--border);
+    background: transparent; font-size: 15px;
+  }
+  .icon-pick.sel { border-color: var(--accent); background: rgba(59,130,246,.15); }
+  #habit-colors { display: flex; gap: 7px; }
+  .color-pick { width: 22px; height: 22px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; }
+  .color-pick.sel { border-color: #fff; }
+
+  /* ════════════════════════════════
+     POMODORO
+  ════════════════════════════════ */
+  #pomo-wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  #pomo-modes { display: flex; gap: 6px; margin-bottom: 20px; }
+  .pomo-mode-btn {
+    flex: 1; padding: 7px 4px; border-radius: 8px; border: none;
+    font-size: 11px; font-weight: 500; background: transparent; color: var(--text3);
+  }
+  .pomo-mode-btn.active { }
+  #pomo-ring-wrap { display: flex; flex-direction: column; align-items: center; margin-bottom: 20px; }
+  #pomo-svg { transform: rotate(-90deg); }
+  #pomo-track { fill: none; stroke: var(--border); stroke-width: 8; }
+  #pomo-arc { fill: none; stroke-width: 8; stroke-linecap: round; transition: stroke-dashoffset .5s ease, stroke .3s; }
+  #pomo-timer-text { font-family: 'JetBrains Mono', monospace; font-size: 32px; font-weight: 500; letter-spacing: 3px; }
+  #pomo-mode-label { font-size: 11px; color: var(--text3); margin-top: 3px; }
+  #pomo-controls { display: flex; gap: 8px; margin-top: 16px; }
+  #pomo-start { border: none; border-radius: 9px; padding: 10px 32px; color: #fff; font-weight: 600; font-size: 14px; }
+  #pomo-reset { background: transparent; border: 1px solid var(--border); border-radius: 9px; padding: 10px 14px; color: var(--text2); font-size: 16px; }
+  #pomo-custom { display: flex; gap: 7px; }
+  #pomo-custom-inp { flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; color: var(--text); font-size: 12px; }
+  #pomo-custom-set { background: var(--border); border: none; border-radius: 8px; padding: 8px 14px; color: var(--text2); font-size: 12px; }
+  #pomo-stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+  .pomo-stat { background: var(--bg); border-radius: 9px; padding: 12px 14px; }
+  .pomo-stat-label { font-size: 10px; color: var(--text3); margin-bottom: 5px; font-family: 'JetBrains Mono', monospace; }
+  .pomo-stat-val { font-size: 22px; font-weight: 600; color: var(--accent); }
+  .pomo-stat-sub { font-size: 11px; color: var(--text2); margin-top: 2px; }
+  #pomo-bar-wrap { display: flex; gap: 6px; align-items: flex-end; height: 80px; }
+  .pomo-bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .pomo-bar-cnt { font-size: 9px; font-family: 'JetBrains Mono', monospace; }
+  .pomo-bar { width: 100%; border-radius: 4px; transition: height .5s; }
+  .pomo-bar-day { font-size: 8px; color: var(--text3); }
+
+  /* ════════════════════════════════
+     NOTE
+  ════════════════════════════════ */
+  #note-wrap { display: grid; grid-template-columns: 220px 1fr; min-height: 460px; }
+  #note-sidebar { border-right: 1px solid var(--border); display: flex; flex-direction: column; }
+  #note-sidebar-top { padding: 14px 12px 10px; }
+  #note-list { flex: 1; overflow-y: auto; padding: 0 8px; }
+  .note-item {
+    padding: 9px 10px; border-radius: 8px; margin-bottom: 3px; cursor: pointer;
+    background: transparent; border: 1px solid transparent; transition: all .15s;
+  }
+  .note-item.active { background: rgba(59,130,246,.15); border-color: rgba(59,130,246,.3); }
+  .note-item-title { font-size: 12px; font-weight: 500; color: var(--text); margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .note-item.active .note-item-title { color: var(--accent); }
+  .note-item-meta { display: flex; gap: 5px; align-items: center; font-size: 9px; font-family: 'JetBrains Mono', monospace; color: var(--text3); }
+  #note-add { padding: 10px 10px 14px; border-top: 1px solid var(--border); }
+  #note-add-row { display: flex; gap: 5px; }
+  #note-new-title { flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: 7px; padding: 7px 8px; color: var(--text); font-size: 11px; }
+  #note-add-btn { background: var(--accent); border: none; border-radius: 7px; padding: 7px 12px; color: #fff; font-size: 14px; font-weight: 700; }
+  #note-editor { display: flex; flex-direction: column; padding: 20px; }
+  #note-editor-header { display: flex; gap: 10px; margin-bottom: 16px; align-items: center; }
+  #note-title-inp { flex: 1; background: transparent; border: none; border-bottom: 1px solid var(--border); font-size: 18px; font-weight: 600; color: var(--text); padding: 4px 0; font-family: 'Inter', sans-serif; }
+  #note-tag-sel { background: var(--bg); border: 1px solid var(--border); border-radius: 7px; padding: 5px 8px; color: var(--gold); font-size: 11px; }
+  #note-del-btn { background: transparent; border: 1px solid var(--border); border-radius: 7px; padding: 5px 10px; color: var(--text3); font-size: 12px; }
+  #note-body { flex: 1; background: transparent; border: none; color: var(--text2); font-size: 13px; line-height: 1.9; resize: none; min-height: 340px; font-family: 'Inter', sans-serif; }
+  #note-footer { font-size: 10px; color: var(--text3); font-family: 'JetBrains Mono', monospace; margin-top: 10px; }
+  #note-empty { display: flex; align-items: center; justify-content: center; color: var(--text3); font-size: 13px; }
+  #note-search { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 7px; padding: 7px 10px; color: var(--text); font-size: 12px; margin-top: 10px; }
+
+  /* ── 반응형 / PWA ── */
+  #bottom-nav { display: none; }
+
+  @media (max-width: 640px) {
+    #app { padding: 12px 12px calc(80px + env(safe-area-inset-bottom)) 12px; }
+    .header { padding: 12px 16px; border-radius: 10px; }
+    .header-title { font-size: 14px; }
+    .nav { display: none; }
+
+    /* 하단 탭바 */
+    #bottom-nav {
+      display: flex !important;
+      position: fixed; bottom: 0; left: 0; right: 0;
+      background: rgba(22,27,39,.97);
+      border-top: 1px solid var(--border);
+      padding: 8px 0 calc(8px + env(safe-area-inset-bottom));
+      z-index: 100;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+    }
+    .bnav-btn {
+      flex: 1; display: flex; flex-direction: column; align-items: center;
+      gap: 3px; background: none; border: none;
+      color: var(--text3); font-size: 10px; font-family: 'Inter', sans-serif;
+      padding: 6px 0; transition: color .15s;
+    }
+    .bnav-btn .bnav-icon { font-size: 22px; line-height: 1; }
+    .bnav-btn.active { color: var(--accent); }
+
+    .card { border-radius: 10px; padding: 14px; }
+    #todo-input-row { flex-wrap: wrap; }
+    #todo-priority { width: 100%; }
+    .todo-date { display: none; }
+
+    #tab-habit .card { padding: 14px 0 14px 14px; }
+    .habit-name-cell { width: 156px; }
+
+    #pomo-wrap { grid-template-columns: 1fr; }
+
+    #note-wrap { grid-template-columns: 1fr; }
+    #note-sidebar { border-right: none; border-bottom: 1px solid var(--border); max-height: 220px; }
+    #note-list { max-height: 130px; }
+    #note-body { min-height: 220px; }
+
+    .btn-primary { padding: 12px 20px; font-size: 14px; }
+    .habit-cell { width: 38px; height: 38px; }
+    .filter-btn { padding: 7px 10px; font-size: 11px; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ── 헤더 ── -->
+  <div class="header">
+    <div>
+      <div class="header-title">📋 FocusKit</div>
+      <div class="header-date" id="header-date"></div>
+    </div>
+    <nav class="nav">
+      <button class="nav-btn active" onclick="showTab('todo')">✅ 할 일</button>
+      <button class="nav-btn" onclick="showTab('habit')">🗓 습관</button>
+      <button class="nav-btn" onclick="showTab('pomo')">🍅 포모도로</button>
+      <button class="nav-btn" onclick="showTab('note')">📝 노트</button>
+    </nav>
+  </div>
+
+  <!-- ════════════════════════════════
+       TODO TAB
+  ════════════════════════════════ -->
+  <div id="tab-todo" class="tab active fadeIn">
+    <div class="card">
+      <div class="stitle">✅ 할 일 목록</div>
+      <div id="todo-stats"></div>
+      <div id="todo-progress"><div id="todo-progress-bar"></div></div>
+      <div id="todo-input-row">
+        <input id="todo-input" class="inp" placeholder="새 할 일 추가... (Enter)" onkeydown="if(event.key==='Enter')todoAdd()">
+        <select id="todo-priority">
+          <option value="high">🔴 높음</option>
+          <option value="normal" selected>🔵 보통</option>
+          <option value="low">⚪ 낮음</option>
+        </select>
+        <button class="btn-primary" onclick="todoAdd()">추가</button>
+      </div>
+      <div id="todo-filters">
+        <button class="filter-btn active" onclick="todoFilter('all',this)">전체</button>
+        <button class="filter-btn" onclick="todoFilter('active',this)">진행중</button>
+        <button class="filter-btn" onclick="todoFilter('done',this)">완료</button>
+        <button class="filter-btn" onclick="todoFilter('high',this)">🔴 긴급</button>
+        <button class="icon-btn" style="margin-left:auto;font-size:11px" onclick="todoClearDone()">완료 삭제</button>
+      </div>
+      <div id="todo-list"></div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════
+       HABIT TAB
+  ════════════════════════════════ -->
+  <div id="tab-habit" class="tab fadeIn">
+    <div class="card">
+      <div class="stitle">🗓 습관 트래커</div>
+      <div id="habit-date-header"></div>
+      <div id="habit-rows"></div>
+      <div id="habit-add">
+        <div id="habit-add-row">
+          <input id="habit-new-name" placeholder="새 습관 이름..." onkeydown="if(event.key==='Enter')habitAdd()">
+          <button class="btn-primary" onclick="habitAdd()">추가</button>
+        </div>
+        <div id="habit-icons"></div>
+        <div id="habit-colors"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════
+       POMODORO TAB
+  ════════════════════════════════ -->
+  <div id="tab-pomo" class="tab fadeIn">
+    <div id="pomo-wrap">
+      <!-- 타이머 카드 -->
+      <div class="card">
+        <div class="stitle">🍅 포모도로 타이머</div>
+        <div id="pomo-modes">
+          <button class="pomo-mode-btn active" onclick="pomoMode(0,this)">집중</button>
+          <button class="pomo-mode-btn" onclick="pomoMode(1,this)">짧은 휴식</button>
+          <button class="pomo-mode-btn" onclick="pomoMode(2,this)">긴 휴식</button>
+        </div>
+        <div id="pomo-ring-wrap">
+          <div style="position:relative;width:140px;height:140px">
+            <svg id="pomo-svg" width="140" height="140" viewBox="0 0 140 140">
+              <circle id="pomo-track" cx="70" cy="70" r="52"/>
+              <circle id="pomo-arc" cx="70" cy="70" r="52"/>
+            </svg>
+            <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center">
+              <div id="pomo-timer-text">25:00</div>
+              <div id="pomo-mode-label">집중</div>
+            </div>
+          </div>
+          <div id="pomo-controls">
+            <button id="pomo-start" onclick="pomoToggle()">▶ 시작</button>
+            <button id="pomo-reset" onclick="pomoReset()">↺</button>
+          </div>
+        </div>
+        <div id="pomo-custom">
+          <input id="pomo-custom-inp" placeholder="분 직접 입력 (1~120)" oninput="this.value=this.value.replace(/\D/g,'')" onkeydown="if(event.key==='Enter')pomoCustom()">
+          <button id="pomo-custom-set" onclick="pomoCustom()">설정</button>
+        </div>
+      </div>
+      <!-- 통계 카드 -->
+      <div class="card">
+        <div class="stitle">📊 집중 통계</div>
+        <div id="pomo-stats-grid">
+          <div class="pomo-stat">
+            <div class="pomo-stat-label">오늘 완료</div>
+            <div class="pomo-stat-val" id="pomo-today-val">0세션</div>
+            <div class="pomo-stat-sub" id="pomo-today-min">0분</div>
+          </div>
+          <div class="pomo-stat">
+            <div class="pomo-stat-label">이번 주</div>
+            <div class="pomo-stat-val" id="pomo-week-val">0세션</div>
+            <div class="pomo-stat-sub" id="pomo-week-min">0분</div>
+          </div>
+        </div>
+        <div class="stitle" style="margin-bottom:10px">최근 7일 집중</div>
+        <div id="pomo-bar-wrap"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════
+       NOTE TAB
+  ════════════════════════════════ -->
+  <div id="tab-note" class="tab fadeIn">
+    <div class="card" style="padding:0;overflow:hidden">
+      <div id="note-wrap">
+        <div id="note-sidebar">
+          <div id="note-sidebar-top">
+            <div class="stitle" style="margin-bottom:8px">📝 노트</div>
+            <input id="note-search" placeholder="검색..." oninput="noteRenderList()">
+          </div>
+          <div id="note-list"></div>
+          <div id="note-add">
+            <div id="note-add-row">
+              <input id="note-new-title" placeholder="새 노트 제목..." onkeydown="if(event.key==='Enter')noteAdd()">
+              <button id="note-add-btn" onclick="noteAdd()">+</button>
+            </div>
+          </div>
+        </div>
+        <div id="note-editor">
+          <div id="note-editor-header">
+            <input id="note-title-inp" placeholder="제목" oninput="noteUpdateField('title',this.value)">
+            <select id="note-tag-sel" onchange="noteUpdateField('tag',this.value)">
+              <option value="">태그 없음</option>
+              <option value="아이디어">아이디어</option>
+              <option value="할일">할일</option>
+              <option value="회의">회의</option>
+              <option value="학습">학습</option>
+              <option value="개인">개인</option>
+              <option value="기타">기타</option>
+            </select>
+            <button id="note-del-btn" onclick="noteDelete()">삭제</button>
+          </div>
+          <textarea id="note-body" placeholder="내용을 입력하세요..." oninput="noteUpdateField('body',this.value)"></textarea>
+          <div id="note-footer"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- #app -->
+
+<!-- 모바일 하단 탭바 -->
+<div id="bottom-nav">
+  <button class="bnav-btn active" onclick="showTabMobile('todo',this)">
+    <span class="bnav-icon">✅</span>할 일
+  </button>
+  <button class="bnav-btn" onclick="showTabMobile('habit',this)">
+    <span class="bnav-icon">🗓</span>습관
+  </button>
+  <button class="bnav-btn" onclick="showTabMobile('pomo',this)">
+    <span class="bnav-icon">🍅</span>포모도로
+  </button>
+  <button class="bnav-btn" onclick="showTabMobile('note',this)">
+    <span class="bnav-icon">📝</span>노트
+  </button>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════
+//  유틸
+// ════════════════════════════════════════════════════════
+const load = (k, d) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } };
+const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+const today = () => new Date().toISOString().slice(0, 10);
+const dateKey = (offset = 0) => { const d = new Date(); d.setDate(d.getDate() + offset); return d.toISOString().slice(0, 10); };
+const dayLabel = (iso) => { const [, m, d] = iso.split('-'); return `${m}/${d}`; };
+const WEEKDAYS = ['일','월','화','수','목','금','토'];
+const getDOW = (iso) => WEEKDAYS[new Date(iso).getDay()];
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+// 헤더 날짜
+$('header-date').textContent = new Date().toLocaleDateString('ko-KR', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+
+// 탭 전환
+function showTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  $('tab-' + name).classList.add('active');
+  event.target.classList.add('active');
+  if (name === 'habit') habitRender();
+  if (name === 'pomo')  pomoRenderBars();
+  if (name === 'note')  noteRenderList();
+}
+
+// ════════════════════════════════════════════════════════
+//  TODO
+// ════════════════════════════════════════════════════════
+let tasks = load('fk_tasks', []);
+let todoCurrentFilter = 'all';
+let todoEditId = null;
+
+const PRIO_COLOR = { high: 'var(--red)', normal: 'var(--accent)', low: 'var(--text3)' };
+
+function todoSave() { save('fk_tasks', tasks); }
+
+function todoAdd() {
+  const inp = $('todo-input');
+  const text = inp.value.trim();
+  if (!text) return;
+  const priority = $('todo-priority').value;
+  tasks.unshift({ id: Date.now(), text, done: false, priority, createdAt: today() });
+  inp.value = '';
+  todoSave();
+  todoRender();
+}
+
+function todoToggle(id) {
+  tasks = tasks.map(t => t.id === id ? { ...t, done: !t.done } : t);
+  todoSave(); todoRender();
+}
+
+function todoDelete(id) {
+  tasks = tasks.filter(t => t.id !== id);
+  todoSave(); todoRender();
+}
+
+function todoStartEdit(id) {
+  todoEditId = id;
+  todoRender();
+  const inp = document.querySelector('.todo-edit-input');
+  if (inp) { inp.focus(); inp.select(); }
+}
+
+function todoSaveEdit(id) {
+  const inp = document.querySelector('.todo-edit-input');
+  if (!inp) return;
+  const val = inp.value.trim();
+  if (val) tasks = tasks.map(t => t.id === id ? { ...t, text: val } : t);
+  todoEditId = null;
+  todoSave(); todoRender();
+}
+
+function todoCancelEdit() { todoEditId = null; todoRender(); }
+
+function todoClearDone() {
+  tasks = tasks.filter(t => !t.done);
+  todoSave(); todoRender();
+}
+
+function todoFilter(f, btn) {
+  todoCurrentFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  todoRender();
+}
+
+function todoRender() {
+  const total = tasks.length;
+  const done = tasks.filter(t => t.done).length;
+  const high = tasks.filter(t => t.priority === 'high' && !t.done).length;
+
+  // 통계 알약
+  const stats = $('todo-stats');
+  stats.innerHTML = `
+    <span class="pill" style="background:rgba(59,130,246,.18);color:var(--accent);border:1px solid rgba(59,130,246,.3)">${total} 전체</span>
+    <span class="pill" style="background:rgba(16,185,129,.15);color:var(--green);border:1px solid rgba(16,185,129,.25)">${done} 완료</span>
+    ${high > 0 ? `<span class="pill" style="background:rgba(239,68,68,.15);color:var(--red);border:1px solid rgba(239,68,68,.25)">${high} 긴급</span>` : ''}
+    ${total > 0 ? `<span class="pill" style="background:rgba(255,255,255,.06);color:var(--text2);border:1px solid var(--border)">${Math.round(done/total*100)}%</span>` : ''}
+  `;
+
+  // 진행 바
+  $('todo-progress-bar').style.width = total > 0 ? `${Math.round(done/total*100)}%` : '0';
+
+  // 필터
+  let filtered = tasks;
+  if (todoCurrentFilter === 'active') filtered = tasks.filter(t => !t.done);
+  else if (todoCurrentFilter === 'done') filtered = tasks.filter(t => t.done);
+  else if (todoCurrentFilter === 'high') filtered = tasks.filter(t => t.priority === 'high');
+
+  const list = $('todo-list');
+  if (filtered.length === 0) {
+    list.innerHTML = `<div class="empty-msg">${todoCurrentFilter === 'done' ? '완료된 항목 없음' : '할 일을 추가해보세요 ✨'}</div>`;
+    return;
+  }
+
+  list.innerHTML = filtered.map(task => {
+    const pc = PRIO_COLOR[task.priority] || 'var(--accent)';
+    const isEdit = todoEditId === task.id;
+    return `
+      <div class="todo-item ${task.done ? 'done' : ''}">
+        <div class="todo-check" onclick="todoToggle(${task.id})"
+          style="border:1.5px solid ${task.done ? 'var(--green)' : pc};background:${task.done ? 'var(--green)' : 'transparent'}">
+          ${task.done ? '<span style="color:#fff;font-size:11px">✓</span>' : ''}
+        </div>
+        <div class="todo-dot" style="background:${pc}"></div>
+        ${isEdit
+          ? `<input class="todo-edit-input" value="${esc(task.text)}"
+               onkeydown="if(event.key==='Enter')todoSaveEdit(${task.id});if(event.key==='Escape')todoCancelEdit()">`
+          : `<span class="todo-text ${task.done ? 'done-text' : ''}">${esc(task.text)}</span>`
+        }
+        <span class="todo-date">${task.createdAt}</span>
+        ${isEdit
+          ? `<button class="icon-btn" style="background:var(--green);color:#fff;border-radius:6px;padding:4px 10px;font-size:11px" onclick="todoSaveEdit(${task.id})">저장</button>`
+          : `<button class="icon-btn" onclick="todoStartEdit(${task.id})">✏️</button>`
+        }
+        <button class="icon-btn" onclick="todoDelete(${task.id})">✕</button>
+      </div>
+    `;
+  }).join('');
+}
+
+// ════════════════════════════════════════════════════════
+//  HABIT
+// ════════════════════════════════════════════════════════
+let habits = load('fk_habits', [
+  { id: 1, name: '물 2L 마시기', color: '#06b6d4', icon: '💧' },
+  { id: 2, name: '30분 운동',    color: '#10b981', icon: '🏃' },
+  { id: 3, name: '독서 20분',    color: '#f59e0b', icon: '📖' },
+]);
+let habitLogs = load('fk_habit_logs', {});
+let habitSelectedIcon = '⭐';
+let habitSelectedColor = '#3b82f6';
+
+const HABIT_ICONS = ['⭐','💧','🏃','📖','🧘','💪','✍️','🎯','🌱','😴','🍎','🧠','🎵','💻','🧹'];
+const HABIT_COLORS = ['#3b82f6','#10b981','#f59e0b','#ef4444','#a855f7','#06b6d4','#ec4899','#f97316'];
+
+function habitSave()  { save('fk_habits', habits); }
+function habitSaveLogs() { save('fk_habit_logs', habitLogs); }
+
+function habitToggle(id, date) {
+  const key = `${id}_${date}`;
+  habitLogs[key] = !habitLogs[key];
+  habitSaveLogs(); habitRender();
+}
+
+function habitAdd() {
+  const name = $('habit-new-name').value.trim();
+  if (!name) return;
+  habits.push({ id: Date.now(), name, color: habitSelectedColor, icon: habitSelectedIcon });
+  $('habit-new-name').value = '';
+  habitSave(); habitRender();
+}
+
+function habitDelete(id) {
+  habits = habits.filter(h => h.id !== id);
+  habitSave(); habitRender();
+}
+
+function habitIsDone(id, date) { return !!habitLogs[`${id}_${date}`]; }
+
+function habitStreak(id) {
+  let s = 0;
+  for (let i = 0; i >= -90; i--) {
+    if (habitIsDone(id, dateKey(i))) s++; else break;
+  }
+  return s;
+}
+
+function habitSelectIcon(ic) {
+  habitSelectedIcon = ic;
+  document.querySelectorAll('.icon-pick').forEach(b => {
+    b.classList.toggle('sel', b.dataset.ic === ic);
+  });
+}
+
+function habitSelectColor(c) {
+  habitSelectedColor = c;
+  document.querySelectorAll('.color-pick').forEach(b => {
+    b.classList.toggle('sel', b.dataset.c === c);
+  });
+}
+
+function habitRender() {
+  const days = Array.from({ length: 7 }, (_, i) => dateKey(i - 6));
+  const todayStr = today();
+
+  // 날짜 헤더
+  $('habit-date-header').innerHTML = days.map(d => `
+    <div class="habit-day-col">
+      <div class="habit-day-label ${d === todayStr ? 'today-col' : ''}">${getDOW(d)}</div>
+      <div class="habit-day-label ${d === todayStr ? 'today-col' : ''}">${dayLabel(d)}</div>
+    </div>
+  `).join('');
+
+  // 습관 행
+  $('habit-rows').innerHTML = habits.map(h => {
+    const streak = habitStreak(h.id);
+    const weekDone = days.filter(d => habitIsDone(h.id, d)).length;
+    const cells = days.map(d => {
+      const done = habitIsDone(h.id, d);
+      const isToday = d === todayStr;
+      return `<div class="habit-cell ${done ? 'done' : ''}"
+        style="background:${done ? h.color : isToday ? h.color + '15' : 'var(--bg)'};border-color:${done ? h.color : isToday ? h.color + '50' : 'var(--border)'};color:${done ? '#fff' : 'transparent'}"
+        onclick="habitToggle(${h.id},'${d}')">✓</div>`;
+    }).join('');
+    return `
+      <div class="habit-row">
+        <div class="habit-name-cell">
+          <span class="habit-icon">${h.icon}</span>
+          <div class="habit-info">
+            <div class="habit-name">${esc(h.name)}</div>
+            <div class="habit-meta">
+              ${streak > 0 ? `<span class="habit-streak" style="color:${h.color}">🔥${streak}일</span>` : ''}
+              <span style="font-size:9px;color:var(--text3);font-family:'JetBrains Mono',monospace">${weekDone}/7</span>
+            </div>
+          </div>
+          <button class="icon-btn" onclick="habitDelete(${h.id})">✕</button>
+        </div>
+        ${cells}
+      </div>
+    `;
+  }).join('');
+
+  // 아이콘 선택기
+  $('habit-icons').innerHTML = HABIT_ICONS.map(ic =>
+    `<button class="icon-pick ${ic === habitSelectedIcon ? 'sel' : ''}" data-ic="${ic}" onclick="habitSelectIcon('${ic}')">${ic}</button>`
+  ).join('');
+
+  // 색상 선택기
+  $('habit-colors').innerHTML = HABIT_COLORS.map(c =>
+    `<div class="color-pick ${c === habitSelectedColor ? 'sel' : ''}" data-c="${c}" style="background:${c}" onclick="habitSelectColor('${c}')"></div>`
+  ).join('');
+}
+
+// ════════════════════════════════════════════════════════
+//  POMODORO
+// ════════════════════════════════════════════════════════
+const POMO_MODES = [
+  { label: '집중',    min: 25, color: '#3b82f6' },
+  { label: '짧은 휴식', min: 5,  color: '#10b981' },
+  { label: '긴 휴식', min: 15, color: '#f59e0b' },
+];
+let pomoModeIdx  = 0;
+let pomoTotalSec = 1500;
+let pomoLeftSec  = 1500;
+let pomoRunning  = false;
+let pomoTimer    = null;
+let pomoSessions = load('fk_pomo', []);
+
+const R = 52, CIRC = 2 * Math.PI * R;
+
+function pomoSetArc() {
+  const arc = $('pomo-arc');
+  const mode = POMO_MODES[pomoModeIdx];
+  const progress = 1 - pomoLeftSec / pomoTotalSec;
+  arc.setAttribute('stroke-dasharray', CIRC);
+  arc.setAttribute('stroke-dashoffset', CIRC * (1 - progress));
+  arc.setAttribute('stroke', mode.color);
+  $('pomo-start').style.background = mode.color;
+}
+
+function pomoUpdateDisplay() {
+  const mm = String(Math.floor(pomoLeftSec / 60)).padStart(2, '0');
+  const ss = String(pomoLeftSec % 60).padStart(2, '0');
+  $('pomo-timer-text').textContent = `${mm}:${ss}`;
+  pomoSetArc();
+}
+
+function pomoMode(i, btn) {
+  clearInterval(pomoTimer); pomoRunning = false;
+  pomoModeIdx = i;
+  pomoTotalSec = POMO_MODES[i].min * 60;
+  pomoLeftSec  = pomoTotalSec;
+  $('pomo-start').textContent = '▶ 시작';
+  $('pomo-mode-label').textContent = POMO_MODES[i].label;
+  document.querySelectorAll('.pomo-mode-btn').forEach((b, j) => {
+    b.classList.toggle('active', j === i);
+    b.style.background = j === i ? POMO_MODES[j].color + '20' : 'transparent';
+    b.style.color = j === i ? POMO_MODES[j].color : 'var(--text3)';
+    b.style.outline = j === i ? `1px solid ${POMO_MODES[j].color}40` : 'none';
+  });
+  pomoUpdateDisplay();
+}
+
+function pomoToggle() {
+  if (pomoRunning) {
+    clearInterval(pomoTimer); pomoRunning = false;
+    $('pomo-start').textContent = '▶ 계속';
+  } else {
+    pomoRunning = true;
+    $('pomo-start').textContent = '⏸ 일시정지';
+    pomoTimer = setInterval(() => {
+      pomoLeftSec--;
+      if (pomoLeftSec <= 0) {
+        clearInterval(pomoTimer); pomoRunning = false;
+        $('pomo-start').textContent = '▶ 시작';
+        if (pomoModeIdx === 0) {
+          pomoSessions = [{ date: today(), ts: Date.now() }, ...pomoSessions].slice(0, 300);
+          save('fk_pomo', pomoSessions);
+          pomoRenderStats();
+        }
+        pomoLeftSec = 0;
+      }
+      pomoUpdateDisplay();
+    }, 1000);
+  }
+}
+
+function pomoReset() {
+  clearInterval(pomoTimer); pomoRunning = false;
+  pomoLeftSec = pomoTotalSec;
+  $('pomo-start').textContent = '▶ 시작';
+  pomoUpdateDisplay();
+}
+
+function pomoCustom() {
+  const m = parseInt($('pomo-custom-inp').value);
+  if (m > 0 && m <= 120) {
+    clearInterval(pomoTimer); pomoRunning = false;
+    pomoTotalSec = m * 60; pomoLeftSec = m * 60;
+    $('pomo-custom-inp').value = '';
+    $('pomo-start').textContent = '▶ 시작';
+    pomoUpdateDisplay();
+  }
+}
+
+function pomoRenderStats() {
+  const todaySessions = pomoSessions.filter(s => s.date === today()).length;
+  const last7 = Array.from({ length: 7 }, (_, i) => {
+    const k = dateKey(i - 6);
+    return { date: k, count: pomoSessions.filter(s => s.date === k).length };
+  });
+  const weekTotal = last7.reduce((a, d) => a + d.count, 0);
+  $('pomo-today-val').textContent = `${todaySessions}세션`;
+  $('pomo-today-min').textContent = `${todaySessions * 25}분`;
+  $('pomo-week-val').textContent  = `${weekTotal}세션`;
+  $('pomo-week-min').textContent  = `${weekTotal * 25}분`;
+  pomoRenderBars(last7);
+}
+
+function pomoRenderBars(last7arg) {
+  const last7 = last7arg || Array.from({ length: 7 }, (_, i) => {
+    const k = dateKey(i - 6);
+    return { date: k, count: pomoSessions.filter(s => s.date === k).length };
+  });
+  const maxCount = Math.max(...last7.map(d => d.count), 1);
+  const todayStr = today();
+  $('pomo-bar-wrap').innerHTML = last7.map(({ date, count }) => {
+    const h = count === 0 ? 4 : Math.min(4 + count * 12, 52);
+    const isToday = date === todayStr;
+    return `
+      <div class="pomo-bar-col">
+        <div class="pomo-bar-cnt" style="color:${count > 0 ? 'var(--accent)' : 'transparent'}">${count}</div>
+        <div style="flex:1;display:flex;align-items:flex-end;width:100%">
+          <div class="pomo-bar" style="height:${h}px;background:${isToday ? 'var(--accent)' : 'var(--border)'};opacity:${count === 0 ? 0.3 : 0.4 + count * 0.12}"></div>
+        </div>
+        <div class="pomo-bar-day" style="color:${isToday ? 'var(--accent)' : 'var(--text3)'}">${getDOW(date)}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+// ════════════════════════════════════════════════════════
+//  NOTE
+// ════════════════════════════════════════════════════════
+let notes = load('fk_notes', [
+  { id: 1, title: '환영합니다 👋', body: 'FocusKit 노트에 오신 걸 환영해요!\n\n자유롭게 메모하고 태그로 정리하세요.\n모든 데이터는 브라우저에 자동 저장됩니다.', tag: '안내', updatedAt: today() }
+]);
+let noteSelected = notes[0]?.id || null;
+
+function noteSave() { save('fk_notes', notes); }
+
+function noteAdd() {
+  const title = $('note-new-title').value.trim();
+  if (!title) return;
+  const n = { id: Date.now(), title, body: '', tag: '', updatedAt: today() };
+  notes.unshift(n);
+  noteSelected = n.id;
+  $('note-new-title').value = '';
+  noteSave(); noteRenderList(); noteRenderEditor();
+}
+
+function noteDelete() {
+  if (!noteSelected) return;
+  if (!confirm('이 노트를 삭제할까요?')) return;
+  notes = notes.filter(n => n.id !== noteSelected);
+  noteSelected = notes[0]?.id || null;
+  noteSave(); noteRenderList(); noteRenderEditor();
+}
+
+function noteSelect(id) {
+  noteSelected = id;
+  noteRenderList(); noteRenderEditor();
+}
+
+function noteUpdateField(field, val) {
+  notes = notes.map(n => n.id === noteSelected ? { ...n, [field]: val, updatedAt: today() } : n);
+  noteSave();
+  if (field === 'title' || field === 'tag') noteRenderList();
+  $('note-footer').textContent = `${($('note-body').value || '').length}자 · ${today()}`;
+}
+
+function noteRenderList() {
+  const search = ($('note-search').value || '').toLowerCase();
+  const filtered = notes.filter(n =>
+    n.title.toLowerCase().includes(search) || n.body.toLowerCase().includes(search)
+  );
+  $('note-list').innerHTML = filtered.map(n => `
+    <div class="note-item ${n.id === noteSelected ? 'active' : ''}" onclick="noteSelect(${n.id})">
+      <div class="note-item-title">${esc(n.title)}</div>
+      <div class="note-item-meta">
+        ${n.tag ? `<span style="color:var(--gold)">${esc(n.tag)}</span>` : ''}
+        <span>${n.updatedAt}</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+function noteRenderEditor() {
+  const cur = notes.find(n => n.id === noteSelected);
+  if (!cur) {
+    $('note-editor-header').style.display = 'none';
+    $('note-body').style.display = 'none';
+    $('note-footer').textContent = '노트를 선택하거나 새로 만드세요';
+    return;
+  }
+  $('note-editor-header').style.display = 'flex';
+  $('note-body').style.display = 'block';
+  $('note-title-inp').value = cur.title;
+  $('note-tag-sel').value   = cur.tag || '';
+  $('note-body').value      = cur.body;
+  $('note-footer').textContent = `${cur.body.length}자 · ${cur.updatedAt}`;
+}
+
+// ════════════════════════════════════════════════════════
+//  초기화
+// ════════════════════════════════════════════════════════
+todoRender();
+habitRender();
+pomoUpdateDisplay();
+pomoMode(0, document.querySelector('.pomo-mode-btn'));
+pomoRenderStats();
+noteRenderList();
+noteRenderEditor();
+
+// 모바일 하단 탭바용
+function showTabMobile(name, btn) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.bnav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  if (btn) btn.classList.add('active');
+  if (name === 'habit') habitRender();
+  if (name === 'pomo')  pomoRenderBars();
+  if (name === 'note')  { noteRenderList(); noteRenderEditor(); }
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// PWA 서비스워커 등록
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
+  });
+}
+</script>
+</body>
+</html>
