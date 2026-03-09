@@ -584,6 +584,9 @@
       <input id="notif-username" class="inp" placeholder="이름 입력 (예: 홍길동)" style="font-size:18px">
     </div>
 
+    <div style="display:flex;gap:10px;margin-bottom:12px">
+      <button style="flex:1;background:var(--green);border:none;border-radius:10px;padding:13px;color:#fff;font-weight:700;font-size:16px;cursor:pointer" onclick="testNotif()">🔔 알림 테스트</button>
+    </div>
     <div style="display:flex;gap:10px">
       <button class="btn-primary" style="flex:1;font-size:18px" onclick="saveNotifSettings()">저장</button>
       <button class="btn-ghost" style="font-size:18px" onclick="closeNotifSettings()">닫기</button>
@@ -649,7 +652,7 @@ function dbListen(key, cb) {
 let notifSettings = lsLoad('fk_notif', { enabled: false, type: 'sound', username: '' });
 let myUsername = notifSettings.username || '';
 let lastKnownCounts = { tasks: 0, notes: 0, habits: 0 };
-
+let notifInitialized = false;
 
 function openNotifSettings() {
   $('notif-modal').style.display = 'flex';
@@ -668,13 +671,28 @@ function updateNotifSlider(on) {
   knob.style.transform = on ? 'translateX(24px)' : 'translateX(0)';
 }
 
-function toggleNotif(on) {
+async function toggleNotif(on) {
   updateNotifSlider(on);
-  if (on && Notification.permission === 'default') {
-    Notification.requestPermission().then(p => {
-      if (p !== 'granted') { $('notif-toggle').checked = false; updateNotifSlider(false); alert('알림 권한이 필요해요. 브라우저 설정에서 허용해주세요!'); }
-    });
+  if (on) {
+    const p = await Notification.requestPermission();
+    if (p !== 'granted') { $('notif-toggle').checked = false; updateNotifSlider(false); alert('알림 권한이 필요해요!'); }
   }
+}
+
+function testNotif() {
+  if (Notification.permission !== 'granted') {
+    alert('먼저 알림 권한을 허용해주세요!');
+    return;
+  }
+  new Notification('📋 FocusKit 테스트', { body: '알림이 정상 작동해요! 🎉', tag: 'focuskit-test' });
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.frequency.value = 880; gain.gain.value = 0.3;
+    osc.start(); osc.stop(ctx.currentTime + 0.15);
+  } catch(e) {}
 }
 
 function saveNotifSettings() {
