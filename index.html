@@ -10,6 +10,56 @@
 <meta name="theme-color" content="#0f1117">
 <link rel="manifest" href="manifest.json">
 <title>📋 FocusKit</title>
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+  import { getFirestore, doc, setDoc, getDoc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyA0UqHP0P50FjWss90GEnVdNkJD4ZyRbwk",
+    authDomain: "focuskit-ffef2.firebaseapp.com",
+    projectId: "focuskit-ffef2",
+    storageBucket: "focuskit-ffef2.firebasestorage.app",
+    messagingSenderId: "60713684347",
+    appId: "1:60713684347:web:bc250dbec4ae530ef5c1de"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  // ── Firebase 저장/불러오기 헬퍼 ──
+  const FAMILY_ID = 'family'; // 가족 공유 ID (고정)
+
+  async function fbSave(key, data) {
+    try {
+      await setDoc(doc(db, 'focuskit', FAMILY_ID, 'data', key), { value: JSON.stringify(data) });
+    } catch(e) { console.warn('FB save fail', e); }
+  }
+
+  async function fbLoad(key, def) {
+    try {
+      const snap = await getDoc(doc(db, 'focuskit', FAMILY_ID, 'data', key));
+      if (snap.exists()) return JSON.parse(snap.data().value);
+    } catch(e) {}
+    return def;
+  }
+
+  function fbListen(key, cb) {
+    return onSnapshot(doc(db, 'focuskit', FAMILY_ID, 'data', key), snap => {
+      if (snap.exists()) {
+        try { cb(JSON.parse(snap.data().value)); } catch(e) {}
+      }
+    });
+  }
+
+  // 전역으로 노출
+  window.fbSave  = fbSave;
+  window.fbLoad  = fbLoad;
+  window.fbListen = fbListen;
+  window.fbReady = true;
+
+  // 초기화 완료 알림
+  window.dispatchEvent(new Event('fb-ready'));
+</script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
 
@@ -311,6 +361,7 @@
       <button class="nav-btn" onclick="showTab('pomo')">🍅 포모도로</button>
       <button class="nav-btn" onclick="showTab('note')">📝 노트</button>
     </nav>
+    <div id="sync-status" style="font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace">⏳ 연결 중...</div>
   </div>
 
   <!-- ════════════════════════════════
@@ -477,8 +528,6 @@
 // ════════════════════════════════════════════════════════
 //  유틸
 // ════════════════════════════════════════════════════════
-const load = (k, d) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } };
-const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
 const today = () => new Date().toISOString().slice(0, 10);
 const dateKey = (offset = 0) => { const d = new Date(); d.setDate(d.getDate() + offset); return d.toISOString().slice(0, 10); };
 const dayLabel = (iso) => { const [, m, d] = iso.split('-'); return `${m}/${d}`; };
@@ -486,6 +535,35 @@ const WEEKDAYS = ['일','월','화','수','목','금','토'];
 const getDOW = (iso) => WEEKDAYS[new Date(iso).getDay()];
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+// ── Firebase 래퍼 (fallback: localStorage) ──
+const lsLoad = (k, d) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } };
+const lsSave = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+
+async function dbSave(key, data) {
+  lsSave(key, data); // 오프라인 fallback
+  if (window.fbReady) await window.fbSave(key, data);
+}
+
+async function dbLoad(key, def) {
+  if (window.fbReady) {
+    const v = await window.fbLoad(key, null);
+    if (v !== null) { lsSave(key, v); return v; }
+  }
+  return lsLoad(key, def);
+}
+
+function dbListen(key, cb) {
+  if (window.fbReady) window.fbListen(key, cb);
+}
+
+// 동기 연결 표시
+function showSyncStatus(ok) {
+  const el = $('sync-status');
+  if (!el) return;
+  el.textContent = ok ? '☁️ 실시간 동기화' : '💾 로컬 저장';
+  el.style.color = ok ? 'var(--green)' : 'var(--text3)';
+}
 
 // 헤더 날짜
 $('header-date').textContent = new Date().toLocaleDateString('ko-KR', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
@@ -504,13 +582,12 @@ function showTab(name) {
 // ════════════════════════════════════════════════════════
 //  TODO
 // ════════════════════════════════════════════════════════
-let tasks = load('fk_tasks', []);
+let tasks = [];
 let todoCurrentFilter = 'all';
 let todoEditId = null;
-
 const PRIO_COLOR = { high: 'var(--red)', normal: 'var(--accent)', low: 'var(--text3)' };
 
-function todoSave() { save('fk_tasks', tasks); }
+function todoSave() { dbSave('fk_tasks', tasks); }
 
 function todoAdd() {
   const inp = $('todo-input');
@@ -519,48 +596,34 @@ function todoAdd() {
   const priority = $('todo-priority').value;
   tasks.unshift({ id: Date.now(), text, done: false, priority, createdAt: today() });
   inp.value = '';
-  todoSave();
-  todoRender();
+  todoSave(); todoRender();
 }
-
 function todoToggle(id) {
   tasks = tasks.map(t => t.id === id ? { ...t, done: !t.done } : t);
   todoSave(); todoRender();
 }
-
 function todoDelete(id) {
   tasks = tasks.filter(t => t.id !== id);
   todoSave(); todoRender();
 }
-
 function todoStartEdit(id) {
-  todoEditId = id;
-  todoRender();
+  todoEditId = id; todoRender();
   const inp = document.querySelector('.todo-edit-input');
   if (inp) { inp.focus(); inp.select(); }
 }
-
 function todoSaveEdit(id) {
   const inp = document.querySelector('.todo-edit-input');
   if (!inp) return;
   const val = inp.value.trim();
   if (val) tasks = tasks.map(t => t.id === id ? { ...t, text: val } : t);
-  todoEditId = null;
-  todoSave(); todoRender();
+  todoEditId = null; todoSave(); todoRender();
 }
-
 function todoCancelEdit() { todoEditId = null; todoRender(); }
-
-function todoClearDone() {
-  tasks = tasks.filter(t => !t.done);
-  todoSave(); todoRender();
-}
-
+function todoClearDone() { tasks = tasks.filter(t => !t.done); todoSave(); todoRender(); }
 function todoFilter(f, btn) {
   todoCurrentFilter = f;
   document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  todoRender();
+  btn.classList.add('active'); todoRender();
 }
 
 function todoRender() {
@@ -621,20 +684,20 @@ function todoRender() {
 // ════════════════════════════════════════════════════════
 //  HABIT
 // ════════════════════════════════════════════════════════
-let habits = load('fk_habits', [
+let habits = [
   { id: 1, name: '물 2L 마시기', color: '#06b6d4', icon: '💧' },
   { id: 2, name: '30분 운동',    color: '#10b981', icon: '🏃' },
   { id: 3, name: '독서 20분',    color: '#f59e0b', icon: '📖' },
-]);
-let habitLogs = load('fk_habit_logs', {});
+];
+let habitLogs = {};
 let habitSelectedIcon = '⭐';
 let habitSelectedColor = '#3b82f6';
 
 const HABIT_ICONS = ['⭐','💧','🏃','📖','🧘','💪','✍️','🎯','🌱','😴','🍎','🧠','🎵','💻','🧹'];
 const HABIT_COLORS = ['#3b82f6','#10b981','#f59e0b','#ef4444','#a855f7','#06b6d4','#ec4899','#f97316'];
 
-function habitSave()  { save('fk_habits', habits); }
-function habitSaveLogs() { save('fk_habit_logs', habitLogs); }
+function habitSave() { dbSave('fk_habits', habits); }
+function habitSaveLogs() { dbSave('fk_habit_logs', habitLogs); }
 
 function habitToggle(id, date) {
   const key = `${id}_${date}`;
@@ -744,7 +807,7 @@ let pomoTotalSec = 1500;
 let pomoLeftSec  = 1500;
 let pomoRunning  = false;
 let pomoTimer    = null;
-let pomoSessions = load('fk_pomo', []);
+let pomoSessions = [];
 
 const R = 52, CIRC = 2 * Math.PI * R;
 
@@ -795,7 +858,7 @@ function pomoToggle() {
         $('pomo-start').textContent = '▶ 시작';
         if (pomoModeIdx === 0) {
           pomoSessions = [{ date: today(), ts: Date.now() }, ...pomoSessions].slice(0, 300);
-          save('fk_pomo', pomoSessions);
+          dbSave('fk_pomo', pomoSessions);
           pomoRenderStats();
         }
         pomoLeftSec = 0;
@@ -862,12 +925,10 @@ function pomoRenderBars(last7arg) {
 // ════════════════════════════════════════════════════════
 //  NOTE
 // ════════════════════════════════════════════════════════
-let notes = load('fk_notes', [
-  { id: 1, title: '환영합니다 👋', body: 'FocusKit 노트에 오신 걸 환영해요!\n\n자유롭게 메모하고 태그로 정리하세요.\n모든 데이터는 브라우저에 자동 저장됩니다.', tag: '안내', updatedAt: today() }
-]);
-let noteSelected = notes[0]?.id || null;
+let notes = [];
+let noteSelected = null;
 
-function noteSave() { save('fk_notes', notes); }
+function noteSave() { dbSave('fk_notes', notes); }
 
 function noteAdd() {
   const title = $('note-new-title').value.trim();
@@ -878,7 +939,6 @@ function noteAdd() {
   $('note-new-title').value = '';
   noteSave(); noteRenderList(); noteRenderEditor();
 }
-
 function noteDelete() {
   if (!noteSelected) return;
   if (!confirm('이 노트를 삭제할까요?')) return;
@@ -886,35 +946,27 @@ function noteDelete() {
   noteSelected = notes[0]?.id || null;
   noteSave(); noteRenderList(); noteRenderEditor();
 }
-
-function noteSelect(id) {
-  noteSelected = id;
-  noteRenderList(); noteRenderEditor();
-}
-
+function noteSelect(id) { noteSelected = id; noteRenderList(); noteRenderEditor(); }
 function noteUpdateField(field, val) {
   notes = notes.map(n => n.id === noteSelected ? { ...n, [field]: val, updatedAt: today() } : n);
   noteSave();
   if (field === 'title' || field === 'tag') noteRenderList();
   $('note-footer').textContent = `${($('note-body').value || '').length}자 · ${today()}`;
 }
-
 function noteRenderList() {
   const search = ($('note-search').value || '').toLowerCase();
-  const filtered = notes.filter(n =>
-    n.title.toLowerCase().includes(search) || n.body.toLowerCase().includes(search)
-  );
-  $('note-list').innerHTML = filtered.map(n => `
-    <div class="note-item ${n.id === noteSelected ? 'active' : ''}" onclick="noteSelect(${n.id})">
-      <div class="note-item-title">${esc(n.title)}</div>
-      <div class="note-item-meta">
-        ${n.tag ? `<span style="color:var(--gold)">${esc(n.tag)}</span>` : ''}
-        <span>${n.updatedAt}</span>
-      </div>
-    </div>
-  `).join('');
+  const filtered = notes.filter(n => n.title.toLowerCase().includes(search) || n.body.toLowerCase().includes(search));
+  $('note-list').innerHTML = filtered.length === 0
+    ? `<div style="padding:20px;text-align:center;color:var(--text3);font-size:12px">노트 없음</div>`
+    : filtered.map(n => `
+      <div class="note-item ${n.id === noteSelected ? 'active' : ''}" onclick="noteSelect(${n.id})">
+        <div class="note-item-title">${esc(n.title)}</div>
+        <div class="note-item-meta">
+          ${n.tag ? `<span style="color:var(--gold)">${esc(n.tag)}</span>` : ''}
+          <span>${n.updatedAt}</span>
+        </div>
+      </div>`).join('');
 }
-
 function noteRenderEditor() {
   const cur = notes.find(n => n.id === noteSelected);
   if (!cur) {
@@ -932,21 +984,50 @@ function noteRenderEditor() {
 }
 
 // ════════════════════════════════════════════════════════
-//  초기화
+//  초기화 — Firebase 로드 후 렌더
 // ════════════════════════════════════════════════════════
-todoRender();
-habitRender();
-pomoUpdateDisplay();
-pomoMode(0, document.querySelector('.pomo-mode-btn'));
-pomoRenderStats();
-noteRenderList();
-noteRenderEditor();
+async function initApp() {
+  // 1. Firebase에서 데이터 로드
+  const [t, h, hl, p, n] = await Promise.all([
+    dbLoad('fk_tasks', []),
+    dbLoad('fk_habits', [
+      { id: 1, name: '물 2L 마시기', color: '#06b6d4', icon: '💧' },
+      { id: 2, name: '30분 운동',    color: '#10b981', icon: '🏃' },
+      { id: 3, name: '독서 20분',    color: '#f59e0b', icon: '📖' },
+    ]),
+    dbLoad('fk_habit_logs', {}),
+    dbLoad('fk_pomo', []),
+    dbLoad('fk_notes', [
+      { id: 1, title: '환영합니다 👋', body: 'FocusKit에 오신 걸 환영해요!\n\n가족과 함께 실시간으로 공유됩니다 ☁️', tag: '안내', updatedAt: today() }
+    ]),
+  ]);
+  tasks = t; habits = h; habitLogs = hl; pomoSessions = p; notes = n;
+  noteSelected = notes[0]?.id || null;
 
-// 모바일 하단 탭바용
+  // 2. 첫 렌더
+  todoRender(); habitRender();
+  pomoUpdateDisplay();
+  pomoMode(0, document.querySelector('.pomo-mode-btn'));
+  pomoRenderStats();
+  noteRenderList(); noteRenderEditor();
+  showSyncStatus(window.fbReady);
+
+  // 3. 실시간 리스너 — 다른 기기에서 바꾸면 자동 반영
+  dbListen('fk_tasks', v => { tasks = v; todoRender(); });
+  dbListen('fk_habits', v => { habits = v; habitRender(); });
+  dbListen('fk_habit_logs', v => { habitLogs = v; habitRender(); });
+  dbListen('fk_pomo', v => { pomoSessions = v; pomoRenderStats(); });
+  dbListen('fk_notes', v => {
+    notes = v;
+    if (!notes.find(n => n.id === noteSelected)) noteSelected = notes[0]?.id || null;
+    noteRenderList(); noteRenderEditor();
+  });
+}
+
+// 모바일 하단 탭바
 function showTabMobile(name, btn) {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-  document.querySelectorAll('.bnav-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.nav-btn, .bnav-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('tab-' + name).classList.add('active');
   if (btn) btn.classList.add('active');
   if (name === 'habit') habitRender();
@@ -955,11 +1036,18 @@ function showTabMobile(name, btn) {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-// PWA 서비스워커 등록
+// Firebase 준비되면 실행, 아니면 바로 실행
+if (window.fbReady) {
+  initApp();
+} else {
+  window.addEventListener('fb-ready', initApp);
+  // 3초 안에 Firebase 안 되면 로컬로 실행
+  setTimeout(() => { if (!window.fbReady) initApp(); }, 3000);
+}
+
+// PWA 서비스워커
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js').catch(() => {});
-  });
+  window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
 }
 </script>
 </body>
