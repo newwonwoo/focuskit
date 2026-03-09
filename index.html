@@ -284,7 +284,7 @@
   #note-add { padding: 12px 12px 16px; border-top: 1px solid var(--border); }
   #note-add-row { display: flex; gap: 6px; }
   #note-new-title { flex: 1; background: var(--bg); border: 1.5px solid var(--border); border-radius: 9px; padding: 10px 12px; color: var(--text); font-size: 14px; }
-  #note-add-btn { background: var(--accent); border: none; border-radius: 9px; padding: 10px 16px; color: #fff; font-size: 18px; font-weight: 700; }
+  #note-add-btn { width: 100%; background: var(--accent); border: none; border-radius: 10px; padding: 14px; color: #fff; font-size: 18px; font-weight: 700; cursor: pointer; }
   #note-editor { display: flex; flex-direction: column; padding: 22px; }
   #note-editor-header { display: flex; gap: 10px; margin-bottom: 18px; align-items: center; }
   #note-title-inp { flex: 1; background: transparent; border: none; border-bottom: 1.5px solid var(--border); font-size: 22px; font-weight: 700; color: var(--text); padding: 6px 0; font-family: 'Inter', sans-serif; }
@@ -352,8 +352,10 @@
       <button class="nav-btn" onclick="showTab('habit')">🗓 습관</button>
       <button class="nav-btn" onclick="showTab('pomo')">🍅 포모도로</button>
       <button class="nav-btn" onclick="showTab('note')">📝 노트</button>
+      <button class="nav-btn" onclick="showTab('shop')">🛒 쇼핑</button>
     </nav>
     <div id="sync-status" style="font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace">⏳ 연결 중...</div>
+    <button id="notif-btn" onclick="openNotifSettings()" style="background:var(--bg);border:1.5px solid var(--border);border-radius:10px;padding:10px 14px;color:var(--text2);font-size:20px;cursor:pointer" title="알림 설정">🔔</button>
   </div>
 
   <!-- ════════════════════════════════
@@ -459,37 +461,81 @@
   </div>
 
   <!-- ════════════════════════════════
-       NOTE TAB
+       SHOP TAB
+  ════════════════════════════════ -->
+  <div id="tab-shop" class="tab fadeIn">
+    <!-- 검색 바 -->
+    <div class="card" style="margin-bottom:14px">
+      <div class="stitle">🛒 관심 품목 · 핫딜 검색</div>
+      <div style="display:flex;gap:10px;margin-bottom:12px">
+        <input id="shop-search-inp" class="inp" placeholder="검색어 입력... (예: 유기농 사과)" style="flex:1" onkeydown="if(event.key==='Enter')shopSearchAll()">
+        <button class="btn-primary" onclick="shopSearchAll()" style="white-space:nowrap">🔍 검색</button>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button onclick="shopOpen('naver', $('shop-search-inp').value)" style="flex:1;min-width:120px;background:#03C75A;border:none;border-radius:12px;padding:14px;color:#fff;font-size:17px;font-weight:700;cursor:pointer">🟢 네이버쇼핑</button>
+        <button onclick="shopOpen('google', $('shop-search-inp').value)" style="flex:1;min-width:120px;background:#4285F4;border:none;border-radius:12px;padding:14px;color:#fff;font-size:17px;font-weight:700;cursor:pointer">🔵 구글쇼핑</button>
+        <button onclick="shopOpen('coupang', $('shop-search-inp').value)" style="flex:1;min-width:120px;background:#E74C3C;border:none;border-radius:12px;padding:14px;color:#fff;font-size:17px;font-weight:700;cursor:pointer">🔴 쿠팡</button>
+      </div>
+    </div>
+
+    <!-- 관심 품목 목록 -->
+    <div class="card">
+      <div class="stitle" style="margin-bottom:14px">⭐ 관심 품목 등록</div>
+
+      <!-- 추가 폼 -->
+      <div style="display:flex;gap:10px;margin-bottom:6px">
+        <input id="shop-item-inp" class="inp" placeholder="품목명 (예: 유기농 사과 주스)" style="flex:1;font-size:18px" onkeydown="if(event.key==='Enter')shopAddItem()">
+        <button class="btn-primary" onclick="shopAddItem()">추가</button>
+      </div>
+      <div style="font-size:14px;color:var(--text2);margin-bottom:18px">💡 등록하면 버튼 하나로 네이버·구글·쿠팡 동시 검색!</div>
+
+      <!-- 품목 리스트 -->
+      <div id="shop-list"></div>
+
+      <!-- 빠른 추가 태그 -->
+      <div style="margin-top:18px">
+        <div style="font-size:14px;color:var(--text2);margin-bottom:10px;font-weight:600">자주 찾는 카테고리</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap" id="shop-quick-tags"></div>
+      </div>
+    </div>
+  </div>
   ════════════════════════════════ -->
   <div id="tab-note" class="tab fadeIn">
     <div class="card" style="padding:0;overflow:hidden">
       <div id="note-wrap">
+        <!-- 사이드바 -->
         <div id="note-sidebar">
           <div id="note-sidebar-top">
-            <div class="stitle" style="margin-bottom:8px">📝 노트</div>
-            <input id="note-search" placeholder="검색..." oninput="noteRenderList()">
+            <div class="stitle" style="margin-bottom:10px">📝 노트</div>
+            <input id="note-search" class="inp" placeholder="🔍 검색..." oninput="noteRenderList()" style="font-size:18px;padding:12px 14px;">
           </div>
           <div id="note-list"></div>
           <div id="note-add">
-            <div id="note-add-row">
-              <input id="note-new-title" placeholder="새 노트 제목..." onkeydown="if(event.key==='Enter')noteAdd()">
-              <button id="note-add-btn" onclick="noteAdd()">+</button>
-            </div>
+            <button id="note-add-btn" onclick="noteStartNew()">＋ 새 노트</button>
           </div>
         </div>
+        <!-- 에디터 -->
         <div id="note-editor">
+          <div id="note-new-form" style="display:none;margin-bottom:16px;padding:16px;background:var(--bg);border-radius:12px;border:1.5px solid var(--accent);">
+            <div style="font-size:14px;color:var(--accent);font-weight:600;margin-bottom:10px">새 노트</div>
+            <input id="note-new-title" class="inp" placeholder="제목 입력..." style="font-size:20px;margin-bottom:10px" onkeydown="if(event.key==='Enter')noteAdd()">
+            <div style="display:flex;gap:8px">
+              <button class="btn-primary" style="flex:1" onclick="noteAdd()">추가</button>
+              <button class="btn-ghost" onclick="noteCancelNew()">취소</button>
+            </div>
+          </div>
           <div id="note-editor-header">
             <input id="note-title-inp" placeholder="제목" oninput="noteUpdateField('title',this.value)">
             <select id="note-tag-sel" onchange="noteUpdateField('tag',this.value)">
               <option value="">태그 없음</option>
-              <option value="아이디어">아이디어</option>
-              <option value="할일">할일</option>
-              <option value="회의">회의</option>
-              <option value="학습">학습</option>
-              <option value="개인">개인</option>
-              <option value="기타">기타</option>
+              <option value="아이디어">💡 아이디어</option>
+              <option value="할일">✅ 할일</option>
+              <option value="회의">📅 회의</option>
+              <option value="학습">📚 학습</option>
+              <option value="개인">👤 개인</option>
+              <option value="기타">📌 기타</option>
             </select>
-            <button id="note-del-btn" onclick="noteDelete()">삭제</button>
+            <button id="note-del-btn" onclick="noteDelete()">🗑</button>
           </div>
           <textarea id="note-body" placeholder="내용을 입력하세요..." oninput="noteUpdateField('body',this.value)"></textarea>
           <div id="note-footer"></div>
@@ -499,6 +545,48 @@
   </div>
 
 </div><!-- #app -->
+
+<!-- 알림 설정 모달 -->
+<div id="notif-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;align-items:center;justify-content:center;padding:20px">
+  <div style="background:var(--card);border:1.5px solid var(--border);border-radius:20px;padding:28px;width:100%;max-width:380px">
+    <div style="font-size:22px;font-weight:700;color:var(--text);margin-bottom:6px">🔔 알림 설정</div>
+    <div style="font-size:15px;color:var(--text2);margin-bottom:24px">다른 사람이 항목 추가 시 알림</div>
+
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+      <span style="font-size:18px;font-weight:600;color:var(--text)">푸시 알림 켜기</span>
+      <label style="position:relative;display:inline-block;width:54px;height:30px">
+        <input type="checkbox" id="notif-toggle" style="opacity:0;width:0;height:0" onchange="toggleNotif(this.checked)">
+        <span id="notif-slider" style="position:absolute;inset:0;background:var(--border);border-radius:30px;cursor:pointer;transition:.3s">
+          <span style="position:absolute;left:3px;top:3px;width:24px;height:24px;background:#fff;border-radius:50%;transition:.3s;display:block" id="notif-knob"></span>
+        </span>
+      </label>
+    </div>
+
+    <div id="notif-sound-section" style="margin-bottom:20px">
+      <div style="font-size:16px;font-weight:600;color:var(--text);margin-bottom:12px">알림 방식</div>
+      <div style="display:flex;gap:10px">
+        <label style="flex:1;display:flex;align-items:center;gap:10px;background:var(--bg);border:1.5px solid var(--border);border-radius:12px;padding:14px;cursor:pointer">
+          <input type="radio" name="notif-type" value="sound" id="notif-sound" style="width:20px;height:20px;accent-color:var(--accent)">
+          <span style="font-size:18px">🔊 소리</span>
+        </label>
+        <label style="flex:1;display:flex;align-items:center;gap:10px;background:var(--bg);border:1.5px solid var(--border);border-radius:12px;padding:14px;cursor:pointer">
+          <input type="radio" name="notif-type" value="vibrate" id="notif-vibrate" style="width:20px;height:20px;accent-color:var(--accent)">
+          <span style="font-size:18px">📳 진동</span>
+        </label>
+      </div>
+    </div>
+
+    <div id="notif-user-section" style="margin-bottom:24px">
+      <div style="font-size:16px;font-weight:600;color:var(--text);margin-bottom:10px">내 이름 설정</div>
+      <input id="notif-username" class="inp" placeholder="이름 입력 (예: 홍길동)" style="font-size:18px">
+    </div>
+
+    <div style="display:flex;gap:10px">
+      <button class="btn-primary" style="flex:1;font-size:18px" onclick="saveNotifSettings()">저장</button>
+      <button class="btn-ghost" style="font-size:18px" onclick="closeNotifSettings()">닫기</button>
+    </div>
+  </div>
+</div>
 
 <!-- 모바일 하단 탭바 -->
 <div id="bottom-nav">
@@ -513,6 +601,9 @@
   </button>
   <button class="bnav-btn" onclick="showTabMobile('note',this)">
     <span class="bnav-icon">📝</span>노트
+  </button>
+  <button class="bnav-btn" onclick="showTabMobile('shop',this)">
+    <span class="bnav-icon">🛒</span>쇼핑
   </button>
 </div>
 
@@ -549,8 +640,97 @@ function dbListen(key, cb) {
   if (window.fbReady) window.fbListen(key, cb);
 }
 
-// 동기 연결 표시
-function showSyncStatus(ok) {
+// ════════════════════════════════════════════════════════
+//  푸시 알림
+// ════════════════════════════════════════════════════════
+let notifSettings = lsLoad('fk_notif', { enabled: false, type: 'sound', username: '' });
+let myUsername = notifSettings.username || '';
+let lastKnownCounts = { tasks: 0, notes: 0, habits: 0 };
+let notifInitialized = false;
+
+function openNotifSettings() {
+  $('notif-modal').style.display = 'flex';
+  $('notif-toggle').checked = notifSettings.enabled;
+  $('notif-username').value = notifSettings.username || '';
+  const typeEl = document.querySelector(`input[name="notif-type"][value="${notifSettings.type || 'sound'}"]`);
+  if (typeEl) typeEl.checked = true;
+  updateNotifSlider(notifSettings.enabled);
+}
+function closeNotifSettings() { $('notif-modal').style.display = 'none'; }
+
+function updateNotifSlider(on) {
+  const slider = $('notif-slider');
+  const knob = $('notif-knob');
+  slider.style.background = on ? 'var(--accent)' : 'var(--border)';
+  knob.style.transform = on ? 'translateX(24px)' : 'translateX(0)';
+}
+
+function toggleNotif(on) {
+  updateNotifSlider(on);
+  if (on && Notification.permission === 'default') {
+    Notification.requestPermission().then(p => {
+      if (p !== 'granted') { $('notif-toggle').checked = false; updateNotifSlider(false); alert('알림 권한이 필요해요. 브라우저 설정에서 허용해주세요!'); }
+    });
+  }
+}
+
+function saveNotifSettings() {
+  const username = $('notif-username').value.trim();
+  const type = document.querySelector('input[name="notif-type"]:checked')?.value || 'sound';
+  const enabled = $('notif-toggle').checked;
+  notifSettings = { enabled, type, username };
+  myUsername = username;
+  lsSave('fk_notif', notifSettings);
+  closeNotifSettings();
+  if (enabled) alert('✅ 알림이 설정되었어요!\n다른 사람이 항목을 추가하면 알려드릴게요.');
+}
+
+function sendNotif(title, body) {
+  if (!notifSettings.enabled) return;
+  if (Notification.permission !== 'granted') return;
+
+  new Notification(title, { body, icon: '📋', badge: '📋', tag: 'focuskit' });
+
+  if (notifSettings.type === 'vibrate' && navigator.vibrate) {
+    navigator.vibrate([200, 100, 200]);
+  } else if (notifSettings.type === 'sound') {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.frequency.value = 880; gain.gain.value = 0.3;
+      osc.start(); osc.stop(ctx.currentTime + 0.15);
+    } catch(e) {}
+  }
+}
+
+function checkAndNotify(key, newData, label) {
+  if (!notifInitialized) return;
+  if (!notifSettings.enabled) return;
+
+  const newCount = newData.length;
+  const oldCount = lastKnownCounts[key] || 0;
+
+  if (newCount > oldCount) {
+    const newest = newData[0];
+    const addedBy = newest?.addedBy || '상대방';
+    if (addedBy !== myUsername) {
+      const text = newest?.text || newest?.title || newest?.name || '';
+      sendNotif(`📋 FocusKit — ${label} 추가`, `${addedBy}: ${text}`);
+    }
+  }
+  lastKnownCounts[key] = newCount;
+}
+
+function noteStartNew() {
+  $('note-new-form').style.display = 'block';
+  $('note-new-title').focus();
+}
+function noteCancelNew() {
+  $('note-new-form').style.display = 'none';
+  $('note-new-title').value = '';
+}
   const el = $('sync-status');
   if (!el) return;
   el.textContent = ok ? '☁️ 실시간 동기화' : '💾 로컬 저장';
@@ -586,7 +766,7 @@ function todoAdd() {
   const text = inp.value.trim();
   if (!text) return;
   const priority = $('todo-priority').value;
-  tasks.unshift({ id: Date.now(), text, done: false, priority, createdAt: today() });
+  tasks.unshift({ id: Date.now(), text, done: false, priority, createdAt: today(), addedBy: myUsername });
   inp.value = '';
   todoSave(); todoRender();
 }
@@ -925,10 +1105,11 @@ function noteSave() { dbSave('fk_notes', notes); }
 function noteAdd() {
   const title = $('note-new-title').value.trim();
   if (!title) return;
-  const n = { id: Date.now(), title, body: '', tag: '', updatedAt: today() };
+  const n = { id: Date.now(), title, body: '', tag: '', updatedAt: today(), addedBy: myUsername };
   notes.unshift(n);
   noteSelected = n.id;
   $('note-new-title').value = '';
+  $('note-new-form').style.display = 'none';
   noteSave(); noteRenderList(); noteRenderEditor();
 }
 function noteDelete() {
@@ -976,8 +1157,92 @@ function noteRenderEditor() {
 }
 
 // ════════════════════════════════════════════════════════
-//  초기화 — Firebase 로드 후 렌더
+//  SHOP
 // ════════════════════════════════════════════════════════
+let shopItems = lsLoad('fk_shop', [
+  { id: 1, name: '유기농 사과', emoji: '🍎' },
+  { id: 2, name: '유기농 당근', emoji: '🥕' },
+  { id: 3, name: '유기농 우유', emoji: '🥛' },
+]);
+
+const SHOP_QUICK = ['유기농 간식', '친환경 세제', '유아 로션', '무농약 채소', '아기 이유식', '유기농 과일', '아이 영양제'];
+const SHOP_EMOJIS = ['🍎','🥕','🥛','🧃','🫐','🥦','🧴','🍯','🌾','🐟','🥚','🧸'];
+
+function shopOpen(site, query) {
+  if (!query || !query.trim()) { alert('검색어를 입력해주세요!'); return; }
+  const q = encodeURIComponent(query.trim());
+  const urls = {
+    naver: `https://search.shopping.naver.com/search/all?query=${q}&sort=price_asc`,
+    google: `https://www.google.com/search?tbm=shop&q=${q}&tbs=p_ord:p`,
+    coupang: `https://www.coupang.com/np/search?q=${q}&sorter=priceAsc`
+  };
+  window.open(urls[site], '_blank');
+}
+
+function shopSearchAll() {
+  const q = $('shop-search-inp').value.trim();
+  if (!q) { alert('검색어를 입력해주세요!'); return; }
+  // 약간의 딜레이로 팝업 차단 방지
+  ['naver','google','coupang'].forEach((site, i) => {
+    setTimeout(() => shopOpen(site, q), i * 300);
+  });
+}
+
+function shopAddItem() {
+  const name = $('shop-item-inp').value.trim();
+  if (!name) return;
+  const emoji = SHOP_EMOJIS[Math.floor(Math.random() * SHOP_EMOJIS.length)];
+  shopItems.unshift({ id: Date.now(), name, emoji });
+  $('shop-item-inp').value = '';
+  lsSave('fk_shop', shopItems);
+  shopRender();
+}
+
+function shopDeleteItem(id) {
+  shopItems = shopItems.filter(i => i.id !== id);
+  lsSave('fk_shop', shopItems);
+  shopRender();
+}
+
+function shopSearchItem(name) {
+  $('shop-search-inp').value = name;
+  ['naver','google','coupang'].forEach((site, i) => {
+    setTimeout(() => shopOpen(site, name), i * 300);
+  });
+}
+
+function shopRender() {
+  const list = $('shop-list');
+  if (!list) return;
+
+  if (shopItems.length === 0) {
+    list.innerHTML = `<div style="text-align:center;padding:30px;color:var(--text2);font-size:18px">관심 품목을 추가해보세요!</div>`;
+  } else {
+    list.innerHTML = shopItems.map(item => `
+      <div style="display:flex;align-items:center;gap:14px;padding:16px;background:var(--bg);border-radius:14px;border:1.5px solid var(--border);margin-bottom:10px">
+        <span style="font-size:30px">${item.emoji}</span>
+        <div style="flex:1">
+          <div style="font-size:20px;font-weight:600;color:var(--text)">${esc(item.name)}</div>
+          <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+            <button onclick="shopOpen('naver','${esc(item.name)}')" style="background:#03C75A;border:none;border-radius:8px;padding:7px 12px;color:#fff;font-size:14px;font-weight:700;cursor:pointer">네이버</button>
+            <button onclick="shopOpen('google','${esc(item.name)}')" style="background:#4285F4;border:none;border-radius:8px;padding:7px 12px;color:#fff;font-size:14px;font-weight:700;cursor:pointer">구글</button>
+            <button onclick="shopOpen('coupang','${esc(item.name)}')" style="background:#E74C3C;border:none;border-radius:8px;padding:7px 12px;color:#fff;font-size:14px;font-weight:700;cursor:pointer">쿠팡</button>
+            <button onclick="shopSearchItem('${esc(item.name)}')" style="background:var(--accent);border:none;border-radius:8px;padding:7px 14px;color:#fff;font-size:14px;font-weight:700;cursor:pointer">🔍 전체</button>
+          </div>
+        </div>
+        <button onclick="shopDeleteItem(${item.id})" style="background:transparent;border:none;color:var(--text3);font-size:22px;cursor:pointer;padding:6px">✕</button>
+      </div>
+    `).join('');
+  }
+
+  // 퀵 태그
+  const tags = $('shop-quick-tags');
+  if (tags) {
+    tags.innerHTML = SHOP_QUICK.map(tag => `
+      <button onclick="shopSearchItem('${tag}')" style="background:var(--card);border:1.5px solid var(--border);border-radius:20px;padding:10px 16px;color:var(--text2);font-size:15px;font-weight:500;cursor:pointer;transition:all .15s" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text2)'">${tag}</button>
+    `).join('');
+  }
+}
 async function initApp() {
   // 1. Firebase에서 데이터 로드
   const [t, h, hl, p, n] = await Promise.all([
@@ -996,6 +1261,9 @@ async function initApp() {
   tasks = t; habits = h; habitLogs = hl; pomoSessions = p; notes = n;
   noteSelected = notes[0]?.id || null;
 
+  // 초기 카운트 세팅
+  lastKnownCounts = { tasks: tasks.length, notes: notes.length, habits: habits.length };
+
   // 2. 첫 렌더
   todoRender(); habitRender();
   pomoUpdateDisplay();
@@ -1003,14 +1271,24 @@ async function initApp() {
   pomoRenderStats();
   noteRenderList(); noteRenderEditor();
   showSyncStatus(window.fbReady);
+  shopRender();
 
-  // 3. 실시간 리스너 — 다른 기기에서 바꾸면 자동 반영
-  dbListen('fk_tasks', v => { tasks = v; todoRender(); });
+  // 알림 초기화 완료 (이제부터 변화 감지)
+  setTimeout(() => { notifInitialized = true; }, 2000);
+
+  // 3. 실시간 리스너 — 다른 기기에서 바꾸면 자동 반영 + 알림
+  dbListen('fk_tasks', v => {
+    checkAndNotify('tasks', v, '할 일');
+    tasks = v; todoRender();
+    lastKnownCounts.tasks = v.length;
+  });
   dbListen('fk_habits', v => { habits = v; habitRender(); });
   dbListen('fk_habit_logs', v => { habitLogs = v; habitRender(); });
   dbListen('fk_pomo', v => { pomoSessions = v; pomoRenderStats(); });
   dbListen('fk_notes', v => {
+    checkAndNotify('notes', v, '노트');
     notes = v;
+    lastKnownCounts.notes = v.length;
     if (!notes.find(n => n.id === noteSelected)) noteSelected = notes[0]?.id || null;
     noteRenderList(); noteRenderEditor();
   });
@@ -1025,6 +1303,7 @@ function showTabMobile(name, btn) {
   if (name === 'habit') habitRender();
   if (name === 'pomo')  pomoRenderBars();
   if (name === 'note')  { noteRenderList(); noteRenderEditor(); }
+  if (name === 'shop')  shopRender();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -1044,3 +1323,4 @@ if ('serviceWorker' in navigator) {
 </script>
 </body>
 </html>
+
