@@ -1,20 +1,20 @@
-const CACHE = 'focuskit-v1';
-const ASSETS = ['./index.html', './manifest.json'];
+importScripts('https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/10.7.0/firebase-messaging-compat.js');
 
-self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
-  self.skipWaiting();
+firebase.initializeApp({
+  apiKey: "AIzaSyA0UqHP0P50FjWss90GEnVdNkJD4ZyRbwk",
+  authDomain: "focuskit-ffef2.firebaseapp.com",
+  projectId: "focuskit-ffef2",
+  storageBucket: "focuskit-ffef2.firebasestorage.app",
+  messagingSenderId: "60713684347",
+  appId: "1:60713684347:web:bc250dbec4ae530ef5c1de"
 });
 
-self.addEventListener('activate', e => {
-  e.waitUntil(caches.keys().then(keys =>
-    Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
-  ));
-  self.clients.claim();
-});
+const messaging = firebase.messaging();
 
-self.addEventListener('fetch', e => {
-  e.respondWith(
-    caches.match(e.request).then(r => r || fetch(e.request).catch(() => caches.match('./index.html')))
-  );
+messaging.onBackgroundMessage((payload) => {
+  self.registration.showNotification(payload.notification.title, {
+    body: payload.notification.body,
+    icon: '/icon.png'
+  });
 });
