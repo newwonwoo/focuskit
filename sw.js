@@ -16,7 +16,6 @@ messaging.onBackgroundMessage((payload) => {
   self.registration.showNotification(payload.notification.title, {
     body: payload.notification.body,
     icon: '/icon.png',
-    badge: '/icon.png',
     tag: 'focuskit',
     vibrate: [200, 100, 200]
   });
