@@ -584,7 +584,7 @@
       <input id="notif-username" class="inp" placeholder="이름 입력 (예: 홍길동)" style="font-size:18px">
     </div>
 
-    <div style="display:flex;gap:10px;margin-bottom:12px">
+    <div style="margin-bottom:12px">
       <button style="width:100%;background:var(--green);border:none;border-radius:10px;padding:13px;color:#fff;font-weight:700;font-size:16px;cursor:pointer" onclick="testNotif()">🔔 알림 테스트</button>
     </div>
     <div style="display:flex;gap:10px">
@@ -674,14 +674,24 @@ async function toggleNotif(on) {
   updateNotifSlider(on);
   if (on) {
     const p = await Notification.requestPermission();
-    if (p !== 'granted') { $('notif-toggle').checked = false; updateNotifSlider(false); alert('알림 권한이 필요해요!'); }
+    if (p !== 'granted') {
+      $('notif-toggle').checked = false;
+      updateNotifSlider(false);
+      alert('알림 권한이 필요해요. 브라우저 설정에서 허용해주세요!');
+    }
   }
 }
 
-function testNotif() {
-  alert('현재 권한: ' + Notification.permission);
-  if (Notification.permission !== 'granted') { alert('권한이 없어요!'); return; }
-  new Notification('📋 FocusKit 테스트', { body: '알림 작동! 🎉', tag: 'focuskit-test' });
+async function testNotif() {
+  const p = await Notification.requestPermission();
+  if (p !== 'granted') { alert('알림 권한 없음: ' + p); return; }
+  try {
+    const sw = await navigator.serviceWorker.ready;
+    await sw.showNotification('📋 FocusKit 테스트', { body: '알림 작동! 🎉', tag: 'focuskit-test' });
+  } catch(e) {
+    alert('Service Worker 알림 실패: ' + e.message);
+    try { new Notification('📋 FocusKit 테스트', { body: '알림 작동! 🎉' }); } catch(e2) { alert('알림 완전 실패: ' + e2.message); }
+  }
 }
 
 function saveNotifSettings() {
@@ -695,15 +705,17 @@ function saveNotifSettings() {
   if (enabled) alert('✅ 알림이 설정되었어요!\n다른 사람이 항목을 추가하면 알려드릴게요.');
 }
 
-function sendNotif(title, body) {
+async function sendNotif(title, body) {
   if (!notifSettings.enabled) return;
   if (Notification.permission !== 'granted') return;
 
-  new Notification(title, { body, icon: '📋', badge: '📋', tag: 'focuskit' });
-
+  // 진동
   if (notifSettings.type === 'vibrate' && navigator.vibrate) {
     navigator.vibrate([200, 100, 200]);
-  } else if (notifSettings.type === 'sound') {
+  }
+
+  // 소리
+  if (notifSettings.type === 'sound') {
     try {
       const ctx = new (window.AudioContext || window.webkitAudioContext)();
       const osc = ctx.createOscillator();
@@ -713,14 +725,21 @@ function sendNotif(title, body) {
       osc.start(); osc.stop(ctx.currentTime + 0.15);
     } catch(e) {}
   }
+
+  // 알림: 모바일은 반드시 Service Worker 통해야 함
+  try {
+    const sw = await navigator.serviceWorker.ready;
+    sw.showNotification(title, { body, icon: '/icon.png', tag: 'focuskit', vibrate: [200, 100, 200] });
+  } catch(e) {
+    // 데스크탑 fallback
+    try { new Notification(title, { body, tag: 'focuskit' }); } catch(e2) {}
+  }
 }
 
 function checkAndNotify(key, newData, label) {
   if (!notifSettings.enabled) return;
-
   const newCount = newData.length;
   const oldCount = lastKnownCounts[key] || 0;
-
   if (newCount > oldCount) {
     const newest = newData[0];
     const addedBy = newest?.addedBy || '상대방';
