@@ -85,8 +85,14 @@ export default async function handler(
     // 3. Body schema
     const parsed = kakaoRequestSchema.safeParse(req.body);
     if (!parsed.success) {
-      console.warn('[webhook] body parse failed', parsed.error.flatten());
-      res.status(400).json({ error: 'invalid payload' });
+      // OpenBuilder의 "스킬 테스트" 버튼은 user.id 등을 생략한 최소 payload를 보낸다.
+      // 이 때 400을 리턴하면 OpenBuilder가 "올바르지 않은 스킬 서버 응답"으로 오인하므로
+      // 200 + simpleText(환영 메시지)로 응답해 검증을 통과시킨다.
+      // 진짜 카톡 메시지는 user.id가 항상 포함되어 여기에 걸리지 않는다.
+      console.warn('[webhook] body parse failed — returning welcome as test response', {
+        issues: parsed.error.flatten(),
+      });
+      res.status(200).json(simpleTextResponse(WELCOME_MESSAGE));
       return;
     }
 
