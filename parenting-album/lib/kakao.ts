@@ -99,13 +99,23 @@ function collectUrlStrings(value: unknown, acc: Set<string>): void {
 /**
  * 미디어처럼 보이는 URL인지 간단 판정.
  * 확장자 or 경로 keyword 기반. 카카오 임시 URL은 쿼리파라미터가 붙어있는 경우가 많다.
+ *
+ * 지원 확장자:
+ *  - 이미지: jpg/jpeg, png, gif, webp, heic/heif, avif, bmp, tif/tiff
+ *  - 영상:   mp4, mov, m4v, webm, 3gp, avi, mkv, mts, m2ts, wmv, flv
+ *
+ * 확장자가 없는 URL도 /secureimage/ 등 카카오 스타일 경로면 미디어로 인식.
  */
 function isLikelyMediaUrl(url: string): boolean {
   const lower = url.toLowerCase();
-  if (/\.(jpe?g|png|gif|webp|heic|heif|mp4|mov|m4v|webm|3gp)(\?|$|#)/i.test(lower)) {
+  if (
+    /\.(jpe?g|png|gif|webp|heic|heif|avif|bmp|tiff?|mp4|mov|m4v|webm|3gp|avi|mkv|mts|m2ts|wmv|flv)(\?|$|#)/i.test(
+      lower,
+    )
+  ) {
     return true;
   }
-  if (/\/(secureimage|media|images?|files?|multimedia|attachment)\//i.test(lower)) {
+  if (/\/(secureimage|media|images?|files?|multimedia|attachment|photo|video|clip)\//i.test(lower)) {
     return true;
   }
   return false;

@@ -35,13 +35,25 @@ function ensureConfigured(): void {
   configured = true;
 }
 
-/** URL 확장자 / Content-Type 기반으로 이미지/영상 판정 */
+/**
+ * URL 확장자 / Content-Type 기반으로 이미지/영상 판정.
+ *
+ * 우선순위:
+ *   1) HTTP Content-Type 헤더 (가장 신뢰도 높음)
+ *   2) URL 확장자 — 영상 목록에 일치하면 video, 아니면 image 기본값
+ *
+ * 카카오가 `Content-Type: video/quicktime`, `image/heic` 등을 주면 확장자 없어도 정확히 분류된다.
+ */
 export function detectMediaKind(url: string, contentType?: string): MediaKind {
   const ct = contentType?.toLowerCase() ?? '';
   if (ct.startsWith('video/')) return 'video';
   if (ct.startsWith('image/')) return 'image';
   const lower = url.toLowerCase();
-  if (/\.(mp4|mov|m4v|webm|3gp)(\?|$|#)/.test(lower)) return 'video';
+  if (/\.(mp4|mov|m4v|webm|3gp|avi|mkv|mts|m2ts|wmv|flv|hevc)(\?|$|#)/.test(lower)) {
+    return 'video';
+  }
+  // 이미지 확장자 매치 확인 (명시적). 매치 안 되면 기본값으로 image
+  // (카카오는 이미지를 훨씬 더 자주 보냄)
   return 'image';
 }
 
