@@ -1,0 +1,34 @@
+{
+  "name": "parenting-album",
+  "version": "0.1.0",
+  "private": true,
+  "description": "원우 앨범봇 — 카카오톡 → AI 요약 → Notion → 인쇄용 PDF 자동화 파이프라인",
+  "type": "module",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "dev": "vercel dev",
+    "typecheck": "tsc --noEmit",
+    "summarize": "tsx scripts/weekly-summarize.ts",
+    "summarize:dry": "tsx scripts/weekly-summarize.ts --dry-run",
+    "build:pdf": "tsx scripts/build-pdf.ts",
+    "build:pdf:cmyk": "tsx scripts/build-pdf.ts && tsx scripts/convert-cmyk.ts",
+    "archive": "tsx scripts/archive-originals.ts"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.21.0",
+    "@notionhq/client": "^2.2.15",
+    "cloudinary": "^2.5.1",
+    "handlebars": "^4.7.8",
+    "puppeteer": "^23.0.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@vercel/node": "^3.2.0",
+    "dotenv": "^16.4.5",
+    "tsx": "^4.19.0",
+    "typescript": "^5.5.0"
+  }
+}

@@ -391,4 +391,46 @@ parenting-album/
 
 ---
 
-**끝. 승인 후 Step 0(스캐폴딩)부터 진행합니다.**
+---
+
+## 13. 결정 로그 (Decisions Log)
+
+> 2026-04-11 사용자 승인 완료 — 아래 내용으로 확정.
+
+### 기술 스택 (확정)
+- **언어**: Node.js 20 + TypeScript (ESM)
+- **패키지 매니저**: npm
+- **서버리스**: Vercel Hobby
+- **DB/CMS**: Notion API
+- **이미지**: Cloudinary (무료 25GB)
+- **AI**: Gemini 1.5 Flash
+- **배치**: GitHub Actions (Cron)
+- **PDF**: 로컬 Puppeteer + Handlebars + (선택) Ghostscript CMYK
+
+### 최적화 제안 승인 결과
+| 제안 | 결정 |
+|---|---|
+| A. GitHub Actions Cron | ✅ 채택 |
+| B. Kakao Webhook `waitUntil` 패턴 | ✅ 채택 (B-2) |
+| C. Cloudinary eager transformation | ✅ 채택 |
+| D. Ghostscript CMYK 변환 | ✅ 채택 (선택 스크립트로 제공) |
+| E. Webhook 시크릿 + 사용자 화이트리스트 | ✅ 채택 |
+| F. 1년 후 원본 아카이빙 | ✅ 채택 (Phase 3에서 자동화) |
+
+### 디자인 결정
+- **폰트**:
+  - 제목/표지: **교보손글씨 2019** (엄마 손글씨 느낌)
+  - 본문/에세이: **네이버 마루부리**
+  - 날짜/캡션: **Pretendard**
+- **포토북 사이즈**: **스냅스 A5 하드커버** (148×210mm) 기준
+  - 재단 여백 3mm, 해상도 300 DPI
+  - 다른 업체로 바꿔도 호환 가능하도록 설계
+- **앨범 주기**: 월 1권 (연말 합본은 v0.2)
+
+### 운영 결정
+- **Kakao OpenBuilder**: Step 1 코드 완성 후 별도 가이드(`docs/KAKAO_SETUP.md`) 작성
+- **아카이빙**: PDF 인쇄 완료된 월의 Cloudinary 원본을 로컬 외장하드로 이관 후 삭제 (썸네일·인쇄용은 유지)
+
+---
+
+**끝. Step 0(스캐폴딩)부터 진행 시작 → Step 1, 2, 3, 4 순서로 커밋.**
