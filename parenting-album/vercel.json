@@ -6,5 +6,8 @@
       "maxDuration": 10
     }
   },
-  "regions": ["icn1"]
+  "regions": ["icn1"],
+  "rewrites": [
+    { "source": "/album/:month", "destination": "/api/album/:month" }
+  ]
 }
