@@ -19,6 +19,7 @@
   "dependencies": {
     "@google/generative-ai": "^0.21.0",
     "@notionhq/client": "^2.2.15",
+    "@vercel/functions": "^1.5.0",
     "cloudinary": "^2.5.1",
     "handlebars": "^4.7.8",
     "puppeteer": "^23.0.0",
