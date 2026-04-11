@@ -15,7 +15,16 @@ export interface UploadResult {
   webVideoUrl?: string;
   /** 영상 길이 (초). Cloudinary가 반환한 duration. */
   durationSeconds?: number;
+  /** 원본 이미지 가로 픽셀 (이미지 전용) */
+  width?: number;
+  /** 원본 이미지 세로 픽셀 (이미지 전용) */
+  height?: number;
+  /** 인쇄에 쓰기엔 해상도가 부족한지 (< 1500px 기준) */
+  isLowResolutionForPrint?: boolean;
 }
+
+/** A5 2-up 기준으로 권장되는 최소 가로 픽셀 */
+const MIN_PRINT_WIDTH_PX = 1500;
 
 let configured = false;
 function ensureConfigured(): void {
@@ -57,9 +66,11 @@ export function detectMediaKind(url: string, contentType?: string): MediaKind {
   return 'image';
 }
 
-// 이미지 eager 변환: 인쇄용 3000px + 썸네일 400px (둘 다 JPG로 고정)
+// 이미지 eager 변환:
+//   [0] 인쇄용: 3000px 상한 + quality 100 (재인코딩 손실 제거). A5 300DPI 인쇄에 충분.
+//   [1] 웹 썸네일: 400px + auto quality (대역폭 최적화)
 const IMAGE_EAGER: ReadonlyArray<Record<string, unknown>> = [
-  { width: 3000, crop: 'limit', quality: 'auto:best', format: 'jpg' },
+  { width: 3000, crop: 'limit', quality: '100', format: 'jpg' },
   { width: 400, crop: 'limit', quality: 'auto', format: 'jpg' },
 ];
 
@@ -141,12 +152,27 @@ export async function uploadFromUrl(opts: UploadOptionsInput): Promise<UploadRes
     eager[idx]?.secure_url ?? (eager[idx] as { url?: string } | undefined)?.url;
 
   if (kind === 'image') {
+    const width = typeof result.width === 'number' ? result.width : undefined;
+    const height = typeof result.height === 'number' ? result.height : undefined;
+    const isLowResolutionForPrint =
+      typeof width === 'number' && width < MIN_PRINT_WIDTH_PX;
+
+    if (isLowResolutionForPrint) {
+      console.warn(
+        `[cloudinary] ⚠️ low resolution for print: ${publicId} width=${width}px < ${MIN_PRINT_WIDTH_PX}px. ` +
+          `2-up A5 인쇄에서 소프트하게 보일 수 있음.`,
+      );
+    }
+
     return {
       kind: 'image',
       publicId: result.public_id,
       originalUrl: result.secure_url,
       printUrl: secureUrl(0) ?? result.secure_url,
       thumbUrl: secureUrl(1) ?? result.secure_url,
+      width,
+      height,
+      isLowResolutionForPrint,
     };
   }
 

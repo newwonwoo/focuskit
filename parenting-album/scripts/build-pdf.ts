@@ -132,7 +132,11 @@ function chunk<T>(arr: T[], size: number): T[][] {
 }
 
 function entryToSlot(entry: RawEntryRow): PhotoSlot | null {
-  const imageUrl = entry.mediaPrintUrl ?? entry.mediaUrl;
+  // 원본 URL을 우선 사용 (재인코딩 없는 최고 품질).
+  // 카카오가 대부분 3000px 미만으로 압축해 보내므로 mediaPrintUrl의 eager 변환본과
+  // 동일 크기지만 원본 쪽이 재인코딩 손실이 없다.
+  // 원본이 없거나 너무 커서 (4K+) 다운로드 시 Puppeteer가 버거우면 변환본으로 fallback.
+  const imageUrl = entry.mediaUrl ?? entry.mediaPrintUrl;
   if (!imageUrl) return null;
   return {
     imageUrl,
@@ -249,10 +253,22 @@ async function main(): Promise<void> {
   console.log('[pdf] launching Puppeteer...');
   const browser = await puppeteer.launch({
     headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-lcd-text',
+      '--font-render-hinting=none',
+    ],
   });
   try {
     const page = await browser.newPage();
+    // 레티나 밀도로 렌더링해서 이미지 다운샘플링 방지.
+    // A5 148×210mm × 2.5배 = 고해상 viewport (Chromium 내부 렌더링 품질 향상).
+    await page.setViewport({
+      width: 1480,
+      height: 2100,
+      deviceScaleFactor: 2.5,
+    });
     await page.setContent(html, { waitUntil: 'networkidle0', timeout: 90_000 });
     // 이미지 로드 완료 대기 (networkidle0가 커버하지만 안전하게)
     await page.evaluate(async () => {

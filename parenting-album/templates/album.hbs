@@ -144,6 +144,9 @@
     max-height: 100%;
     object-fit: contain;
     display: block;
+    /* Chromium이 PDF export 시 이미지를 과도하게 다운샘플링하지 않도록 */
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
   }
   .photo-caption {
     font-family: 'Pretendard Variable', sans-serif;
