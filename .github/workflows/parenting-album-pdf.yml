@@ -75,12 +75,22 @@ jobs:
           echo "Building PDF for $MONTH"
           npx tsx scripts/build-pdf.ts --month="$MONTH" --digital-url="https://focuskit-five.vercel.app/album/$MONTH"
 
-      - name: Upload PDF artifact
+      - name: Upload PDF artifact (원본 — 인쇄용)
         uses: actions/upload-artifact@v4
         with:
           name: wonwoo-album-${{ steps.month.outputs.target }}
           path: parenting-album/dist/wonwoo-album-${{ steps.month.outputs.target }}.pdf
           retention-days: 90
+
+      - name: Compress PDF for email (Ghostscript)
+        run: |
+          MONTH="${{ steps.month.outputs.target }}"
+          echo "Compressing PDF for email..."
+          gs -sDEVICE=pdfwrite -dCompatibilityLevel=1.4 -dPDFSETTINGS=/ebook \
+             -dNOPAUSE -dBATCH -dQUIET \
+             -sOutputFile=dist/wonwoo-album-${MONTH}-email.pdf \
+             dist/wonwoo-album-${MONTH}.pdf
+          ls -lh dist/wonwoo-album-${MONTH}*.pdf
 
       - name: Send PDF via email
         if: ${{ env.HAS_EMAIL == 'true' }}
@@ -97,4 +107,8 @@ jobs:
           CLOUDINARY_FOLDER: wonwoo-album
         run: |
           MONTH="${{ steps.month.outputs.target }}"
-          npx tsx scripts/send-email.ts --month="$MONTH" --pdf="dist/wonwoo-album-${MONTH}.pdf"
+          EMAIL_PDF="dist/wonwoo-album-${MONTH}-email.pdf"
+          if [ ! -f "$EMAIL_PDF" ]; then
+            EMAIL_PDF="dist/wonwoo-album-${MONTH}.pdf"
+          fi
+          npx tsx scripts/send-email.ts --month="$MONTH" --pdf="$EMAIL_PDF"
