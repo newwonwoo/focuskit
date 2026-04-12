@@ -134,11 +134,10 @@ function chunk<T>(arr: T[], size: number): T[][] {
 function entryToSlot(entry: RawEntryRow): PhotoSlot | null {
   const rawUrl = entry.mediaPrintUrl ?? entry.mediaUrl;
   if (!rawUrl) return null;
-  // Cloudinary 스마트 크롭: 사진을 A5 비율(148:195)로 채워서 빈 공간 제거.
-  // g_auto = AI가 얼굴/피사체 인식해서 최적 위치로 자동 크롭.
-  // 148:195 = A5에서 캡션 영역을 뺀 사진 영역의 가로:세로 비율.
+  // Cloudinary 스마트 크롭: A5 비율로 채움 + 이메일 첨부 가능한 크기.
+  // w_1200 q_60 → 이미지당 ~150KB, 20장 기준 PDF ~5-10MB (Gmail 25MB 이내).
   const imageUrl = rawUrl.includes('/upload/')
-    ? rawUrl.replace('/upload/', '/upload/c_fill,g_auto,ar_148:195,w_1500,q_80,f_jpg/')
+    ? rawUrl.replace('/upload/', '/upload/c_fill,g_auto,ar_148:195,w_1200,q_60,f_jpg/')
     : rawUrl;
   return {
     imageUrl,

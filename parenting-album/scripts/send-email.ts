@@ -63,7 +63,9 @@ async function main(): Promise<void> {
   const albumUrl = `${opts.albumBaseUrl}/album/${opts.month}`;
 
   const transporter = nodemailer.createTransport({
-    service: 'gmail',
+    host: process.env.EMAIL_SMTP_HOST ?? 'smtp.naver.com',
+    port: Number(process.env.EMAIL_SMTP_PORT ?? '465'),
+    secure: true,
     auth: {
       user: sender,
       pass: appPassword,
