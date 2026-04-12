@@ -215,13 +215,14 @@ async function main(): Promise<void> {
   const month = Number(monthStr);
   console.log(`[pdf] building album for ${year}-${month}`);
 
-  // 1. Notion 조회
-  const [entriesSummarized, entriesPrinted, weeklySummaries] = await Promise.all([
+  // 1. Notion 조회 (Draft/Summarized/Printed 전부 포함)
+  const [entriesDraft, entriesSummarized, entriesPrinted, weeklySummaries] = await Promise.all([
+    queryRawEntriesByMonth(year, month, 'Draft'),
     queryRawEntriesByMonth(year, month, 'Summarized'),
     queryRawEntriesByMonth(year, month, 'Printed'),
     queryWeeklySummariesByMonth(year, month),
   ]);
-  const entries = [...entriesSummarized, ...entriesPrinted].sort(
+  const entries = [...entriesDraft, ...entriesSummarized, ...entriesPrinted].sort(
     (a, b) => a.date.getTime() - b.date.getTime(),
   );
   console.log(
