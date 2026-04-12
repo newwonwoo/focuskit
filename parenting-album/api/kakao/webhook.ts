@@ -211,6 +211,24 @@ export default async function handler(
     // 4. Extract
     const payload = extractPayload(parsed.data);
 
+    // DEBUG: 묶음 사진 진단용 — Kakao payload 구조를 로그에 남김.
+    // mediaUrls 0개(미디어인 것 같은데 못 찾은 경우)나 1개(혹시 더 있을 수 있음)일 때
+    // 원본 body를 일부 출력해서 어디에 URL이 박혀있는지 파악.
+    // 나중에 안정화되면 제거 가능.
+    try {
+      const bodyPreview = JSON.stringify(req.body ?? {}).slice(0, 3000);
+      console.log('[webhook debug] payload summary', {
+        userId: payload.userId,
+        mediaUrlsCount: payload.mediaUrls.length,
+        mediaUrls: payload.mediaUrls,
+        utteranceLength: payload.utterance.length,
+        utterancePreview: payload.utterance.slice(0, 200),
+        bodyPreview,
+      });
+    } catch {
+      /* ignore */
+    }
+
     // 4-b. userId가 비어있으면 (OpenBuilder 스킬 테스트 등) 환영 메시지만 반환
     if (!payload.userId) {
       console.log('[webhook] empty userId — returning welcome (probably skill test)');

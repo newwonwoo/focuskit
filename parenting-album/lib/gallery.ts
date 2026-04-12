@@ -213,21 +213,53 @@ function renderEntry(
   </article>`;
 }
 
-function renderWeek(group: GroupedWeek, users: NotionUser[], commentsByEntry: Map<string, CommentRow[]>): string {
+function renderWeek(
+  group: GroupedWeek,
+  users: NotionUser[],
+  commentsByEntry: Map<string, CommentRow[]>,
+  expanded: boolean,
+): string {
   const summary = group.summary;
   const title = summary?.weekTitle ? escapeHtml(summary.weekTitle) : escapeHtml(group.weekId);
   const essay = summary?.essay ? `<p class="week-essay">${escapeHtml(summary.essay)}</p>` : '';
   const entries = group.entries
     .map((e) => renderEntry(e, commentsByEntry.get(e.pageId) ?? [], users))
     .join('');
-  return `<section class="week">
-    <header class="week-header">
-      <h2 class="week-title">${title}</h2>
-      <p class="week-id">${escapeHtml(group.weekId)}</p>
-    </header>
-    ${essay}
-    <div class="entries">${entries}</div>
-  </section>`;
+  const photoCount = group.entries.length;
+  const commentCount = group.entries.reduce(
+    (sum, e) => sum + (commentsByEntry.get(e.pageId)?.length ?? 0),
+    0,
+  );
+
+  // 주차 날짜 범위 표시 (예: "4월 6일 – 12일")
+  const dates = group.entries
+    .map((e) => e.date)
+    .sort((a, b) => a.getTime() - b.getTime());
+  const startDate = dates[0];
+  const endDate = dates[dates.length - 1];
+  const dateRange =
+    startDate && endDate
+      ? `${startDate.getUTCMonth() + 1}월 ${startDate.getUTCDate()}일${
+          endDate.getUTCDate() !== startDate.getUTCDate() ? ` – ${endDate.getUTCDate()}일` : ''
+        }`
+      : escapeHtml(group.weekId);
+
+  return `<details class="week" ${expanded ? 'open' : ''}>
+    <summary class="week-header">
+      <div class="week-header-main">
+        <h2 class="week-title">${title}</h2>
+        <div class="week-meta">
+          <span class="week-date-range">${escapeHtml(dateRange)}</span>
+          <span class="week-stats">📸 ${photoCount}${commentCount > 0 ? ` · 💬 ${commentCount}` : ''}</span>
+        </div>
+      </div>
+      <span class="week-toggle-icon" aria-hidden="true">▾</span>
+    </summary>
+    <div class="week-body">
+      ${essay}
+      <div class="entries">${entries}</div>
+    </div>
+  </details>`;
 }
 
 // ────────────────────────────────────────────────────────────────
@@ -284,44 +316,88 @@ html, body {
 }
 
 .week {
-  margin-bottom: 48px;
-}
-
-.week-header {
   margin-bottom: 16px;
-}
-
-.week-title {
-  font-size: 24px;
-  font-weight: 600;
-  margin: 0;
-  letter-spacing: -0.01em;
-}
-
-.week-id {
-  font-size: 12px;
-  color: var(--muted);
-  margin: 4px 0 0;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.week-essay {
   background: var(--card);
   border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 20px 24px;
-  margin: 16px 0 24px;
-  font-size: 16px;
-  line-height: 1.8;
+  border-radius: 14px;
   box-shadow: var(--shadow);
+  overflow: hidden;
+}
+/* 기본 details marker(삼각형) 제거. 자체 토글 아이콘 사용 */
+.week > summary { list-style: none; }
+.week > summary::-webkit-details-marker { display: none; }
+
+.week-header {
+  cursor: pointer;
+  padding: 18px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  user-select: none;
+  transition: background 0.15s;
+}
+.week-header:hover {
+  background: #fbfaf6;
+}
+.week-header-main {
+  flex: 1;
+  min-width: 0;
+}
+.week-title {
+  font-size: 20px;
+  font-weight: 600;
+  margin: 0 0 4px;
+  letter-spacing: -0.01em;
+  color: var(--fg);
+}
+.week-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.week-date-range {
+  font-weight: 500;
+}
+.week-stats {
+  font-variant-numeric: tabular-nums;
+}
+.week-toggle-icon {
+  font-size: 16px;
+  color: var(--muted);
+  transition: transform 0.2s;
+  flex-shrink: 0;
+}
+.week[open] > summary .week-toggle-icon {
+  transform: rotate(180deg);
+}
+.week-body {
+  padding: 0 20px 20px;
+  animation: weekBodyFadeIn 0.2s ease-out;
+}
+@keyframes weekBodyFadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* .week-body 내부에 있으므로 중복 배경/테두리 제거하고 상단 여백만 */
+.week-essay {
+  background: #fbfaf6;
+  border-left: 3px solid var(--accent);
+  border-radius: 6px;
+  padding: 14px 18px;
+  margin: 0 0 20px;
+  font-size: 15px;
+  line-height: 1.8;
   white-space: pre-wrap;
 }
 
 .entries {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 20px;
 }
 
 .entry {
@@ -581,7 +657,12 @@ export function renderGallery(data: GalleryData): string {
   const body =
     groups.length === 0
       ? `<div class="empty">아직 이 달의 기록이 없어요 🌱</div>`
-      : groups.map((g) => renderWeek(g, data.activeUsers, data.commentsByEntry)).join('');
+      : groups
+          .map((g, idx) =>
+            // 가장 최근 주차(마지막 인덱스)만 펼친 상태로 시작. 나머지는 접어둠.
+            renderWeek(g, data.activeUsers, data.commentsByEntry, idx === groups.length - 1),
+          )
+          .join('');
 
   return `<!doctype html>
 <html lang="ko">
