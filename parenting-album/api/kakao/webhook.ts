@@ -100,13 +100,14 @@ function getAlbumUrl(date: Date): string | null {
   return `${base}/album/${y}-${m}`;
 }
 
-const ACK_MESSAGE = (name: string, albumUrl: string | null): string => {
+const ACK_MESSAGE = (name: string, albumUrl: string | null, uploadUrl: string | null): string => {
   const line1 = `📸 ${name}의 기록 저장 중이에요`;
   if (!albumUrl) return line1;
+  const uploadLine = uploadUrl ? `\n여러 장 올리기 → ${uploadUrl}` : '';
   return `${line1}
 
-완료되면 여기서 확인하세요 ❤️
-${albumUrl}
+앨범 보기 ❤️
+${albumUrl}${uploadLine}
 
 댓글도 달아주시면 원우에게 좋은 추억이 될 거예요 🌷`;
 };
@@ -326,9 +327,11 @@ export default async function handler(
     //    같은 사용자가 연달아 보내면 첫 번째만 링크 포함 풀 메시지,
     //    이후 20초 내 메시지는 짧은 ACK만 (스팸 방지)
     const useShortAck = shouldSendShortAck(payload.userId);
+    const albumUrl = getAlbumUrl(payload.timestamp);
+    const uploadUrl = albumUrl ? albumUrl.replace('/album/', '/upload').replace(/\/\d{4}-\d{2}$/, '') : null;
     const ackText = useShortAck
       ? ACK_MESSAGE_SHORT(displayName)
-      : ACK_MESSAGE(displayName, getAlbumUrl(payload.timestamp));
+      : ACK_MESSAGE(displayName, albumUrl, uploadUrl);
     res.status(200).json(simpleTextResponse(ackText));
 
     // 7. 백그라운드 처리 (Vercel waitUntil)

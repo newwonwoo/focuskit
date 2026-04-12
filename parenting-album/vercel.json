@@ -8,6 +8,7 @@
   },
   "regions": ["icn1"],
   "rewrites": [
-    { "source": "/album/:month", "destination": "/api/album/:month" }
+    { "source": "/album/:month", "destination": "/api/album/:month" },
+    { "source": "/upload", "destination": "/api/upload/page" }
   ]
 }
