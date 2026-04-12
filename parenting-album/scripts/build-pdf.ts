@@ -188,7 +188,7 @@ function buildViewModel(
         weekId,
         weekLabel: weekId,
         title: summary?.weekTitle || `${weekEntries[0]!.date.getUTCMonth() + 1}월 ${weekEntries[0]!.date.getUTCDate()}일`,
-        essay: '', // AI 에세이 비활성화 — 사진+캡션만 표시
+        essay: summary?.essay || '',
         photoPages,
       };
     });

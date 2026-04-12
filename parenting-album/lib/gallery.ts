@@ -243,7 +243,7 @@ function renderWeek(
 ): string {
   const summary = group.summary;
   const title = summary?.weekTitle ? escapeHtml(summary.weekTitle) : escapeHtml(group.weekId);
-  const essay = ''; // AI 에세이 제거 — 사실을 지어내는 문제로 비활성화. 원본 캡션+댓글만 표시.
+  const essay = summary?.essay ? `<p class="week-essay">${escapeHtml(summary.essay)}</p>` : '';
   const photoCount = group.entries.length;
   const commentCount = group.entries.reduce(
     (sum, e) => sum + (commentsByEntry.get(e.pageId)?.length ?? 0),
