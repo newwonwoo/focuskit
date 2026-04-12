@@ -49,6 +49,19 @@ jobs:
       - name: Install Chromium for Puppeteer
         run: npx puppeteer browsers install chrome
 
+      - name: Run AI summarize (Groq)
+        env:
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          NOTION_DB_RAW_ID: ${{ secrets.NOTION_DB_RAW_ID }}
+          NOTION_DB_USERS_ID: ${{ secrets.NOTION_DB_USERS_ID }}
+          NOTION_DB_WEEKLY_ID: ${{ secrets.NOTION_DB_WEEKLY_ID }}
+          NOTION_DB_COMMENTS_ID: ${{ secrets.NOTION_DB_COMMENTS_ID }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        run: |
+          MONTH="${{ steps.month.outputs.target }}"
+          echo "Running AI summarize for entries in $MONTH"
+          npx tsx scripts/weekly-summarize.ts --days=45 || echo "⚠️ AI summarize failed, continuing with PDF build"
+
       - name: Build PDF
         env:
           NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
