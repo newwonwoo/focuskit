@@ -132,9 +132,13 @@ function chunk<T>(arr: T[], size: number): T[][] {
 }
 
 function entryToSlot(entry: RawEntryRow): PhotoSlot | null {
-  // 인쇄용(3000px, q=100) 우선. PDF 용량 최적화 + 충분한 인쇄 품질.
-  const imageUrl = entry.mediaPrintUrl ?? entry.mediaUrl;
-  if (!imageUrl) return null;
+  const rawUrl = entry.mediaPrintUrl ?? entry.mediaUrl;
+  if (!rawUrl) return null;
+  // PDF용 이미지 최적화: Cloudinary URL에 리사이즈+압축 변환 삽입.
+  // 3000px q100 원본(~5MB) → 1500px q80(~300KB). A5 인쇄에 충분한 품질.
+  const imageUrl = rawUrl.includes('/upload/')
+    ? rawUrl.replace('/upload/', '/upload/w_1500,q_80,f_jpg/')
+    : rawUrl;
   return {
     imageUrl,
     alt: entry.rawContent || '사진',
