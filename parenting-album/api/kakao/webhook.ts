@@ -15,6 +15,7 @@ import {
   findEntryByIdempotencyKey,
   createRawEntry,
   queryRawEntriesByMonth,
+  queryWeeklySummariesByMonth,
   type NotionUser,
 } from '../../lib/notion.js';
 import { generateIdempotencyKey } from '../../lib/idempotency.js';
@@ -123,8 +124,16 @@ const HELP_COMMANDS = new Set([
   '/도움',
 ]);
 
-/** 현황/통계 명령어 */
-const STATS_COMMANDS = new Set([
+/** 최신 에세이 명령어 */
+const ESSAY_COMMANDS = new Set([
+  '이번주',
+  '이번 주',
+  '에세이',
+  '요약',
+  '주간',
+  '/essay',
+  '/이번주',
+]);
   '몇장',
   '몇 장',
   '현황',
@@ -168,6 +177,9 @@ const HELP_MESSAGE = (uploadUrl: string | null, albumUrl: string | null): string
 
 📖 앨범 보기
   → "앨범" 이라고 입력${albumUrl ? `\n  → ${albumUrl}` : ''}
+
+📖 이번 주 에세이
+  → "이번주" 라고 입력
 
 ✏️ 이름 변경
   → "이름변경" 이라고 입력
@@ -422,6 +434,35 @@ export default async function handler(
       // "도움말" → 사용법 안내
       if (HELP_COMMANDS.has(trimmedUtterance)) {
         res.status(200).json(simpleTextResponse(HELP_MESSAGE(uploadUrl, albumUrl)));
+        return;
+      }
+
+      // "이번주" → 최신 주간 에세이
+      if (ESSAY_COMMANDS.has(trimmedUtterance)) {
+        try {
+          const now = payload.timestamp;
+          const summaries = await queryWeeklySummariesByMonth(
+            now.getFullYear(),
+            now.getMonth() + 1,
+          );
+          if (summaries.length === 0) {
+            res.status(200).json(
+              simpleTextResponse('아직 이번 달 주간 요약이 없어요.\n일요일 밤에 자동으로 생성돼요 🌙'),
+            );
+          } else {
+            const latest = summaries.sort((a, b) => b.weekId.localeCompare(a.weekId))[0]!;
+            const essayPreview = latest.essay.length > 200
+              ? latest.essay.slice(0, 200) + '...'
+              : latest.essay;
+            res.status(200).json(
+              simpleTextResponse(
+                `📖 ${latest.weekId}: "${latest.weekTitle}"\n\n${essayPreview}${albumUrl ? `\n\n앨범 보기 → ${albumUrl}` : ''}`,
+              ),
+            );
+          }
+        } catch {
+          res.status(200).json(simpleTextResponse('에세이를 불러오는 중 오류가 발생했어요.'));
+        }
         return;
       }
 
