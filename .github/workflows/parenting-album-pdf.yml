@@ -1,11 +1,15 @@
 name: parenting-album / build PDF
 
 on:
+  # 매월 1일 오전 9시 KST (= UTC 0시) 자동 실행 — 전 달 앨범 생성
+  schedule:
+    - cron: '0 0 1 * *'
+  # 수동 실행도 가능
   workflow_dispatch:
     inputs:
       month:
-        description: '앨범 월 (예: 2026-04)'
-        required: true
+        description: '앨범 월 (예: 2026-04). 비워두면 전 달 자동 계산.'
+        required: false
         type: string
       digital_url:
         description: '디지털 앨범 URL (뒷표지, 선택)'
@@ -32,6 +36,19 @@ jobs:
           cache: 'npm'
           cache-dependency-path: parenting-album/package-lock.json
 
+      - name: Compute target month
+        id: month
+        run: |
+          INPUT_MONTH="${{ github.event.inputs.month }}"
+          if [ -z "$INPUT_MONTH" ]; then
+            # 전 달 자동 계산 (UTC 기준 현재 날짜에서 1개월 전)
+            TARGET=$(date -u -d "$(date -u +%Y-%m-01) -1 month" +%Y-%m 2>/dev/null || date -u -v-1m +%Y-%m)
+          else
+            TARGET="$INPUT_MONTH"
+          fi
+          echo "target=$TARGET" >> "$GITHUB_OUTPUT"
+          echo "📅 Target month: $TARGET"
+
       - name: Install deps
         run: npm ci
 
@@ -47,16 +64,37 @@ jobs:
           NOTION_DB_COMMENTS_ID: ${{ secrets.NOTION_DB_COMMENTS_ID }}
           PDF_OUTPUT_DIR: ./dist
         run: |
-          ARGS="--month=${{ github.event.inputs.month }}"
-          if [ -n "${{ github.event.inputs.digital_url }}" ]; then
-            ARGS="$ARGS --digital-url=${{ github.event.inputs.digital_url }}/album/${{ github.event.inputs.month }}"
-          fi
-          echo "Running: npx tsx scripts/build-pdf.ts $ARGS"
-          npx tsx scripts/build-pdf.ts $ARGS
+          MONTH="${{ steps.month.outputs.target }}"
+          DIGITAL_URL="${{ github.event.inputs.digital_url || 'https://focuskit-five.vercel.app' }}"
+          echo "Building PDF for $MONTH"
+          npx tsx scripts/build-pdf.ts --month="$MONTH" --digital-url="$DIGITAL_URL/album/$MONTH"
 
       - name: Upload PDF artifact
         uses: actions/upload-artifact@v4
         with:
-          name: wonwoo-album-${{ github.event.inputs.month }}
-          path: parenting-album/dist/wonwoo-album-${{ github.event.inputs.month }}.pdf
+          name: wonwoo-album-${{ steps.month.outputs.target }}
+          path: parenting-album/dist/wonwoo-album-${{ steps.month.outputs.target }}.pdf
           retention-days: 90
+
+      - name: Send PDF via email
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.EMAIL_SENDER }}
+          password: ${{ secrets.EMAIL_APP_PASSWORD }}
+          subject: "📖 원우 앨범 ${{ steps.month.outputs.target }} — PDF 완성!"
+          to: ${{ secrets.EMAIL_RECIPIENTS }}
+          from: 원우 앨범봇 <${{ secrets.EMAIL_SENDER }}>
+          body: |
+            원우의 ${{ steps.month.outputs.target }} 앨범 PDF가 완성되었어요! 🎉
+
+            첨부된 PDF를 다운로드해서 확인하세요.
+            인쇄하고 싶으면 스냅스(https://www.snaps.com)에 업로드하면 돼요.
+
+            📖 디지털 앨범으로 보기:
+            https://focuskit-five.vercel.app/album/${{ steps.month.outputs.target }}
+
+            이 메일은 매월 1일 자동으로 발송됩니다 🌷
+          attachments: parenting-album/dist/wonwoo-album-${{ steps.month.outputs.target }}.pdf
