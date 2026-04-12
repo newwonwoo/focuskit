@@ -192,14 +192,16 @@
 </section>
 
 {{#each weeks}}
-  <!-- 에세이 페이지 -->
+  {{!-- 에세이 페이지는 essay가 있을 때만 표시 --}}
+  {{#if this.essay}}
   <section class="page essay-page">
     <p class="week-label">{{this.weekLabel}}</p>
     <h2 class="week-title">{{this.title}}</h2>
     <p class="week-essay">{{this.essay}}</p>
   </section>
+  {{/if}}
 
-  <!-- 사진 페이지들: 페이지당 2장 -->
+  <!-- 사진 페이지들 -->
   {{#each this.photoPages}}
     <section class="page photo-page">
       {{#each this.slots}}
