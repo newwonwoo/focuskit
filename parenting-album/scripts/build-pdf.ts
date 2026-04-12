@@ -123,7 +123,7 @@ function formatDate(d: Date): string {
   return `${m}월 ${day}일`;
 }
 
-const PHOTOS_PER_PAGE = 2;
+const PHOTOS_PER_PAGE = 1;
 
 function chunk<T>(arr: T[], size: number): T[][] {
   const out: T[][] = [];
