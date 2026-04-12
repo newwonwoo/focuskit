@@ -465,7 +465,7 @@ export default async function handler(
     //    이후 20초 내 메시지는 짧은 ACK만 (스팸 방지)
     const useShortAck = shouldSendShortAck(payload.userId);
     const albumUrl = getAlbumUrl(payload.timestamp);
-    const uploadUrl = albumUrl ? albumUrl.replace('/album/', '/upload').replace(/\/\d{4}-\d{2}$/, '') : null;
+    const uploadUrl = getUploadUrl(payload.timestamp);
     const ackText = useShortAck
       ? ACK_MESSAGE_SHORT(displayName)
       : ACK_MESSAGE(displayName, albumUrl, uploadUrl);
