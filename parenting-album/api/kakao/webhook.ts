@@ -124,6 +124,15 @@ const HELP_COMMANDS = new Set([
   '/도움',
 ]);
 
+/** 현황/통계 명령어 */
+const STATS_COMMANDS = new Set([
+  '몇장',
+  '몇 장',
+  '현황',
+  '통계',
+  '/stats',
+]);
+
 /** 최신 에세이 명령어 */
 const ESSAY_COMMANDS = new Set([
   '이번주',
