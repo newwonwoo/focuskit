@@ -79,12 +79,21 @@ export interface ExtractedPayload {
  * 임의의 JSON 값을 재귀 탐색하여 http(s) URL 문자열을 모두 수집.
  * Kakao OpenBuilder는 스킬 설정에 따라 이미지 URL을 다양한 위치(action.params, detailParams 등)에
  * 실어 보내기 때문에 고정된 경로 대신 전체 탐색이 안전하다.
+ *
+ * 문자열 하나에 여러 URL이 공백으로 구분되어 들어있는 경우도 지원한다.
+ * (카카오는 묶음 사진을 한 utterance에 공백 구분으로 여러 URL을 넣어 보냄)
  */
 function collectUrlStrings(value: unknown, acc: Set<string>): void {
   if (value == null) return;
   if (typeof value === 'string') {
-    if (/^https?:\/\//i.test(value)) {
-      acc.add(value);
+    // 문자열 안의 모든 http(s) URL을 추출. 공백/따옴표/괄호에서 중단.
+    const matches = value.match(/https?:\/\/[^\s"'<>()]+/gi);
+    if (matches) {
+      for (const raw of matches) {
+        // 문장 끝 구두점 제거 (예: "... https://x.jpg." → "https://x.jpg")
+        const cleaned = raw.replace(/[.,;:!?]+$/, '');
+        if (cleaned.length > 8) acc.add(cleaned);
+      }
     }
     return;
   }
