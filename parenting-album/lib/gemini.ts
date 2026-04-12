@@ -29,7 +29,7 @@ function getClient(): GoogleGenerativeAI {
   return clientInstance;
 }
 
-const MODEL_NAME = 'gemini-1.5-flash';
+const MODEL_NAME = 'gemini-2.0-flash';
 
 const SYSTEM_PROMPT = `당신은 24개월 아이 "원우"의 성장 기록을 다듬는 따뜻한 관찰자입니다.
 아래는 이번 주 가족들(아빠, 엄마, 조부모, 이모·삼촌 등)이 카카오톡으로 남긴 사진 캡션과
