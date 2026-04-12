@@ -47,16 +47,19 @@ export default async function handler(
       return;
     }
 
-    // Notion에서 필요한 데이터 병렬 조회
-    const [entriesSummarized, entriesPrinted, weeklySummaries, activeUsers] =
+    // Notion에서 필요한 데이터 병렬 조회.
+    // Draft / Summarized / Printed 전부 포함해서 실시간 감상 지원.
+    // (Draft는 주간 Gemini 배치 전의 상태 — 갓 업로드된 사진도 바로 보이도록)
+    const [entriesDraft, entriesSummarized, entriesPrinted, weeklySummaries, activeUsers] =
       await Promise.all([
+        queryRawEntriesByMonth(year, month, 'Draft'),
         queryRawEntriesByMonth(year, month, 'Summarized'),
         queryRawEntriesByMonth(year, month, 'Printed'),
         queryWeeklySummariesByMonth(year, month),
         listActiveUsers(),
       ]);
 
-    const entries = [...entriesSummarized, ...entriesPrinted].sort(
+    const entries = [...entriesDraft, ...entriesSummarized, ...entriesPrinted].sort(
       (a, b) => a.date.getTime() - b.date.getTime(),
     );
     const commentsByEntry = await listCommentsForEntries(entries.map((e) => e.pageId));
