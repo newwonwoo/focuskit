@@ -215,7 +215,30 @@ async function main(): Promise<void> {
   const month = Number(monthStr);
   console.log(`[pdf] building album for ${year}-${month}`);
 
-  // 1. Notion 조회 (Status 무관 — 해당 월의 모든 엔트리)
+  // 1. Notion 조회
+  // 먼저 필터 없이 DB 전체 조회 (진단용)
+  const { Client } = await import('@notionhq/client');
+  const diagClient = new Client({ auth: process.env.NOTION_TOKEN });
+  const dbId = process.env.NOTION_DB_RAW_ID!;
+  console.log(`[pdf diag] querying DB ${dbId} without any filter...`);
+  const diagRes = await diagClient.databases.query({
+    database_id: dbId,
+    page_size: 5,
+  });
+  console.log(`[pdf diag] total results (no filter): ${diagRes.results.length}, has_more: ${diagRes.has_more}`);
+  if (diagRes.results.length > 0) {
+    const first = diagRes.results[0] as any;
+    const dateVal = first.properties?.Date?.date?.start ?? 'NO DATE';
+    const typeVal = first.properties?.Type?.select?.name ?? 'NO TYPE';
+    const statusVal = first.properties?.Status?.status?.name ?? 'NO STATUS';
+    console.log(`[pdf diag] first row: date=${dateVal}, type=${typeVal}, status=${statusVal}`);
+  }
+
+  // 날짜 범위 확인
+  const fromDate = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0));
+  const toDate = new Date(Date.UTC(year, month, 0, 23, 59, 59));
+  console.log(`[pdf diag] date range: ${fromDate.toISOString()} ~ ${toDate.toISOString()}`);
+
   const [allEntries, weeklySummaries] = await Promise.all([
     queryRawEntriesByMonth(year, month),
     queryWeeklySummariesByMonth(year, month),
@@ -229,6 +252,7 @@ async function main(): Promise<void> {
 
   if (entries.length === 0) {
     console.error(`[pdf] no entries for ${year}-${month}, aborting`);
+    console.error(`[pdf] hint: DB has data (diag found ${diagRes.results.length}), but date filter excluded everything.`);
     process.exit(1);
   }
 
