@@ -180,6 +180,10 @@ export default async function handler(
   req: VercelRequest,
   res: VercelResponse,
 ): Promise<void> {
+  // 묶음 사진 진단: 요청 도착 즉시 로그 (검증/처리 이전)
+  const reqId = `r${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+  console.log(`[webhook ARRIVAL] ${reqId} — method=${req.method}`);
+
   try {
     // 1. Method
     if (req.method !== 'POST') {
