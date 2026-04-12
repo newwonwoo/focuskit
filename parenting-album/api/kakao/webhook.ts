@@ -143,12 +143,6 @@ const ESSAY_COMMANDS = new Set([
   '/essay',
   '/이번주',
 ]);
-  '몇장',
-  '몇 장',
-  '현황',
-  '통계',
-  '/stats',
-]);
 
 function getUploadUrl(date: Date): string | null {
   const base =
