@@ -2,41 +2,44 @@ import { z } from 'zod';
 
 /**
  * Kakao i OpenBuilder Webhook 요청 스키마.
- * OpenBuilder는 봇 설정에 따라 필드 구성이 달라지므로 관대하게(passthrough) 파싱하고,
- * 우리가 필요한 필드(user.id, utterance, 이미지 URL)만 extractPayload에서 탐색한다.
+ *
+ * 설계 원칙: 카카오는 버전마다 / 블록 설정마다 페이로드 구조가 달라지고
+ * 일부 필드에 null을 보낼 때가 있다. 그래서 스키마는 **최대한 관대하게** 만들고
+ * (필드 대부분 nullish + passthrough), 우리가 실제로 읽는 user.id만 명시한다.
+ * 나머지는 extractPayload에서 optional chaining으로 안전하게 조회한다.
  */
 const userSchema = z
   .object({
-    id: z.string(),
-    type: z.string().optional(),
-    properties: z.record(z.unknown()).optional(),
+    id: z.string().nullish(),
+    type: z.string().nullish(),
+    properties: z.record(z.unknown()).nullish(),
   })
   .passthrough();
 
 const userRequestSchema = z
   .object({
-    timezone: z.string().optional(),
-    utterance: z.string().default(''),
-    user: userSchema,
+    timezone: z.string().nullish(),
+    utterance: z.string().nullish(),
+    user: userSchema.nullish(),
     block: z
       .object({
-        id: z.string().optional(),
-        name: z.string().optional(),
+        id: z.string().nullish(),
+        name: z.string().nullish(),
       })
       .passthrough()
-      .optional(),
-    lang: z.string().optional(),
-    params: z.record(z.unknown()).optional(),
+      .nullish(),
+    lang: z.string().nullish(),
+    params: z.record(z.unknown()).nullish(),
   })
   .passthrough();
 
 const actionSchema = z
   .object({
-    name: z.string().optional(),
-    id: z.string().optional(),
-    params: z.record(z.unknown()).optional(),
-    detailParams: z.record(z.unknown()).optional(),
-    clientExtra: z.record(z.unknown()).optional(),
+    name: z.string().nullish(),
+    id: z.string().nullish(),
+    params: z.record(z.unknown()).nullish(),
+    detailParams: z.record(z.unknown()).nullish(),
+    clientExtra: z.record(z.unknown()).nullish(),
   })
   .passthrough();
 
@@ -44,21 +47,21 @@ export const kakaoRequestSchema = z
   .object({
     intent: z
       .object({
-        id: z.string().optional(),
-        name: z.string().optional(),
+        id: z.string().nullish(),
+        name: z.string().nullish(),
       })
       .passthrough()
-      .optional(),
-    userRequest: userRequestSchema,
-    action: actionSchema.optional(),
+      .nullish(),
+    userRequest: userRequestSchema.nullish(),
+    action: actionSchema.nullish(),
     bot: z
       .object({
-        id: z.string().optional(),
-        name: z.string().optional(),
+        id: z.string().nullish(),
+        name: z.string().nullish(),
       })
       .passthrough()
-      .optional(),
-    contexts: z.array(z.unknown()).optional(),
+      .nullish(),
+    contexts: z.array(z.unknown()).nullish(),
   })
   .passthrough();
 
@@ -122,16 +125,17 @@ function isLikelyMediaUrl(url: string): boolean {
 }
 
 export function extractPayload(req: KakaoRequest): ExtractedPayload {
-  const userId = req.userRequest.user.id;
-  const utterance = (req.userRequest.utterance ?? '').trim();
-  const messageBlockId = req.userRequest.block?.id ?? req.action?.id ?? 'unknown';
+  // 모든 경로를 안전하게 조회. Kakao가 null을 섞어 보내도 안전.
+  const userId = req.userRequest?.user?.id ?? '';
+  const utterance = (req.userRequest?.utterance ?? '').trim();
+  const messageBlockId = req.userRequest?.block?.id ?? req.action?.id ?? 'unknown';
   const timestamp = new Date();
 
   const urls = new Set<string>();
   collectUrlStrings(req.action?.params, urls);
   collectUrlStrings(req.action?.detailParams, urls);
   collectUrlStrings(req.action?.clientExtra, urls);
-  collectUrlStrings(req.userRequest.params, urls);
+  collectUrlStrings(req.userRequest?.params, urls);
 
   const mediaUrls = Array.from(urls).filter(isLikelyMediaUrl);
 

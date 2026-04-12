@@ -99,6 +99,13 @@ export default async function handler(
     // 4. Extract
     const payload = extractPayload(parsed.data);
 
+    // 4-b. userId가 비어있으면 (OpenBuilder 스킬 테스트 등) 환영 메시지만 반환
+    if (!payload.userId) {
+      console.log('[webhook] empty userId — returning welcome (probably skill test)');
+      res.status(200).json(simpleTextResponse(WELCOME_MESSAGE));
+      return;
+    }
+
     // 5. State machine
     const existingUser = await findUserByKakaoId(payload.userId);
 
