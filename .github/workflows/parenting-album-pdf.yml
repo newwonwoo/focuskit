@@ -84,6 +84,7 @@ jobs:
 
       - name: Compress PDF for email (Ghostscript)
         run: |
+          sudo apt-get install -y ghostscript > /dev/null 2>&1
           MONTH="${{ steps.month.outputs.target }}"
           echo "Compressing PDF for email..."
           gs -sDEVICE=pdfwrite -dCompatibilityLevel=1.4 -dPDFSETTINGS=/ebook \
