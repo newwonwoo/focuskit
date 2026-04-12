@@ -14,6 +14,7 @@ import {
   resetUserToAwaitingName,
   findEntryByIdempotencyKey,
   createRawEntry,
+  queryRawEntriesByMonth,
   type NotionUser,
 } from '../../lib/notion.js';
 import { generateIdempotencyKey } from '../../lib/idempotency.js';
@@ -88,6 +89,91 @@ const RENAME_COMMANDS = new Set([
   '/reset',
   '/이름',
 ]);
+
+/** 업로드 페이지 링크 명령어 */
+const UPLOAD_COMMANDS = new Set([
+  '사진',
+  '사진올리기',
+  '사진 올리기',
+  '업로드',
+  '올리기',
+  '여러장',
+  '여러 장',
+  '/upload',
+  '/사진',
+]);
+
+/** 앨범 보기 명령어 */
+const ALBUM_COMMANDS = new Set([
+  '앨범',
+  '앨범보기',
+  '앨범 보기',
+  '보기',
+  '/album',
+  '/앨범',
+]);
+
+/** 도움말 명령어 */
+const HELP_COMMANDS = new Set([
+  '도움말',
+  '도움',
+  '사용법',
+  '?',
+  '/help',
+  '/도움',
+]);
+
+/** 현황/통계 명령어 */
+const STATS_COMMANDS = new Set([
+  '몇장',
+  '몇 장',
+  '현황',
+  '통계',
+  '/stats',
+]);
+
+function getUploadUrl(date: Date): string | null {
+  const base =
+    process.env.PUBLIC_ALBUM_BASE_URL ??
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null);
+  if (!base) return null;
+  return `${base}/upload`;
+}
+
+const UPLOAD_LINK_MESSAGE = (uploadUrl: string | null): string => {
+  if (!uploadUrl) return '업로드 페이지를 준비 중이에요.';
+  return `📸 여러 장 한꺼번에 올리려면 여기서!
+
+${uploadUrl}
+
+사진·영상을 선택하고 업로드하면
+자동으로 앨범에 추가돼요 🌷`;
+};
+
+const ALBUM_LINK_MESSAGE = (albumUrl: string | null): string => {
+  if (!albumUrl) return '앨범을 준비 중이에요.';
+  return `📖 원우 앨범 보러 가기 ❤️
+
+${albumUrl}`;
+};
+
+const HELP_MESSAGE = (uploadUrl: string | null, albumUrl: string | null): string =>
+  `🌷 원우 앨범봇 사용법
+
+📸 사진/영상 1장 보내기
+  → 바로 전송하면 저장돼요
+
+📸 여러 장 올리기
+  → "사진" 이라고 입력${uploadUrl ? `\n  → ${uploadUrl}` : ''}
+
+📖 앨범 보기
+  → "앨범" 이라고 입력${albumUrl ? `\n  → ${albumUrl}` : ''}
+
+✏️ 이름 변경
+  → "이름변경" 이라고 입력
+
+📊 현황 보기
+  → "몇장" 이라고 입력`;
 
 /** 디지털 앨범 월별 URL 생성 */
 function getAlbumUrl(date: Date): string | null {
@@ -314,6 +400,53 @@ export default async function handler(
       });
       res.status(200).json(simpleTextResponse(ALREADY_REGISTERED(currentName)));
       return;
+    }
+
+    // 5-c-4. 봇 명령어 처리 (활성 사용자, 미디어 없는 텍스트만)
+    if (existingUser.state === 'active' && payload.mediaUrls.length === 0) {
+      const albumUrl = getAlbumUrl(payload.timestamp);
+      const uploadUrl = getUploadUrl(payload.timestamp);
+
+      // "사진" → 업로드 페이지 링크
+      if (UPLOAD_COMMANDS.has(trimmedUtterance)) {
+        res.status(200).json(simpleTextResponse(UPLOAD_LINK_MESSAGE(uploadUrl)));
+        return;
+      }
+
+      // "앨범" → 앨범 링크
+      if (ALBUM_COMMANDS.has(trimmedUtterance)) {
+        res.status(200).json(simpleTextResponse(ALBUM_LINK_MESSAGE(albumUrl)));
+        return;
+      }
+
+      // "도움말" → 사용법 안내
+      if (HELP_COMMANDS.has(trimmedUtterance)) {
+        res.status(200).json(simpleTextResponse(HELP_MESSAGE(uploadUrl, albumUrl)));
+        return;
+      }
+
+      // "몇장" → 이번 달 통계
+      if (STATS_COMMANDS.has(trimmedUtterance)) {
+        try {
+          const now = payload.timestamp;
+          const entries = await queryRawEntriesByMonth(
+            now.getFullYear(),
+            now.getMonth() + 1,
+          );
+          const imageCount = entries.filter((e) => e.type === 'Image' || e.type === 'Mixed').length;
+          const videoCount = entries.filter((e) => e.type === 'Video').length;
+          const textCount = entries.filter((e) => e.type === 'Text').length;
+          const month = `${now.getFullYear()}년 ${now.getMonth() + 1}월`;
+          res.status(200).json(
+            simpleTextResponse(
+              `📊 ${month} 현황\n\n📸 사진 ${imageCount}장\n🎥 영상 ${videoCount}개\n📝 메모 ${textCount}개\n\n총 ${entries.length}개 기록${albumUrl ? `\n\n앨범 보기 → ${albumUrl}` : ''}`,
+            ),
+          );
+        } catch {
+          res.status(200).json(simpleTextResponse('통계를 불러오는 중 오류가 발생했어요.'));
+        }
+        return;
+      }
     }
 
     // 5-d. 활성 사용자 — 정상 저장 플로우
