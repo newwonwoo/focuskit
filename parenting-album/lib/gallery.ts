@@ -243,7 +243,8 @@ function renderWeek(
 ): string {
   const summary = group.summary;
   const title = summary?.weekTitle ? escapeHtml(summary.weekTitle) : escapeHtml(group.weekId);
-  const essay = summary?.essay ? `<p class="week-essay">${escapeHtml(summary.essay)}</p>` : '';
+  // 디지털 앨범은 사진+캡션+댓글만. AI 에세이는 PDF/이메일에서만.
+  const essay = '';
   const photoCount = group.entries.length;
   const commentCount = group.entries.reduce(
     (sum, e) => sum + (commentsByEntry.get(e.pageId)?.length ?? 0),
