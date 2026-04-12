@@ -145,17 +145,21 @@ export function extractPayload(req: KakaoRequest): ExtractedPayload {
 /**
  * Kakao OpenBuilder 응답의 simpleText 템플릿.
  * Webhook 응답은 반드시 이 형식이어야 사용자에게 메시지가 표시된다.
+ *
+ * 주의: Kakao는 text 필드가 비어있는 SimpleText를 거부한다 (에러 2401).
+ * 빈 문자열이 들어오면 안전한 기본값으로 교체.
  */
 export function simpleTextResponse(text: string): {
   version: '2.0';
   template: { outputs: Array<{ simpleText: { text: string } }> };
 } {
+  const safe = text && text.trim().length > 0 ? text : '…';
   return {
     version: '2.0',
     template: {
       outputs: [
         {
-          simpleText: { text },
+          simpleText: { text: safe },
         },
       ],
     },

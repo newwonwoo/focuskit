@@ -38,7 +38,11 @@ const REGISTRATION_COMPLETE = (name: string): string =>
   `${name}(으)로 등록 완료! 🎉
 이제 원우 사진이나 짧은 영상을 보내주시면 예쁜 앨범으로 만들어드릴게요.`;
 
-const DISABLED_REPLY = ''; // 조용히 무응답
+const DISABLED_REPLY = `이용이 제한된 사용자입니다.
+관리자에게 문의해주세요.`;
+
+const ERROR_REPLY = `잠시 후 다시 시도해주세요 🙏
+(서버에서 문제가 발생했어요)`;
 
 // ────────────────────────────────────────────────────────────────
 // Helpers
@@ -176,8 +180,9 @@ export default async function handler(
   } catch (err) {
     console.error('[webhook] top-level error', err);
     if (!res.headersSent) {
-      // Kakao에겐 5xx 대신 빈 simpleText로 응답해 사용자 UX 보호
-      res.status(200).json(simpleTextResponse(''));
+      // Kakao에겐 5xx 대신 200 + 에러 안내 메시지로 응답해 사용자 UX 보호.
+      // Kakao는 빈 SimpleText를 거부하므로 반드시 내용이 있어야 함.
+      res.status(200).json(simpleTextResponse(ERROR_REPLY));
     }
   }
 }
