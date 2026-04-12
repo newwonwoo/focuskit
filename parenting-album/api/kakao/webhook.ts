@@ -111,6 +111,37 @@ ${albumUrl}
 댓글도 달아주시면 원우에게 좋은 추억이 될 거예요 🌷`;
 };
 
+const ACK_MESSAGE_SHORT = (name: string): string =>
+  `📸 ${name}의 기록 계속 저장 중이에요`;
+
+// ────────────────────────────────────────────────────────────────
+// ACK 디듭 윈도우
+//
+// 같은 사용자가 짧은 시간 안에 여러 장/번 보내면 링크 포함 풀 메시지가
+// 반복되면 알림 스팸처럼 느껴진다. 첫 메시지만 풀 ACK + 링크를 주고,
+// 이후 20초 내 메시지는 짧은 "계속 저장 중" 한 줄만 반환.
+//
+// 인메모리 Map이므로 Vercel 서버리스 인스턴스가 재사용되는 동안만 유효.
+// 콜드 스타트 후엔 리셋되지만, 묶음 전송은 보통 수 초 내에 완료되므로
+// 동일 인스턴스 내에서 처리될 확률이 높다.
+// ────────────────────────────────────────────────────────────────
+const ACK_DEDUP_WINDOW_MS = 20_000;
+const lastAckAt = new Map<string, number>();
+
+function shouldSendShortAck(userId: string): boolean {
+  const now = Date.now();
+  const last = lastAckAt.get(userId);
+  lastAckAt.set(userId, now);
+  // 메모리 누수 방지: 1000개 넘어가면 오래된 것부터 정리
+  if (lastAckAt.size > 1000) {
+    const cutoff = now - ACK_DEDUP_WINDOW_MS * 2;
+    for (const [key, ts] of lastAckAt) {
+      if (ts < cutoff) lastAckAt.delete(key);
+    }
+  }
+  return last !== undefined && now - last < ACK_DEDUP_WINDOW_MS;
+}
+
 const REGISTRATION_COMPLETE = (name: string): string =>
   `${name}(으)로 등록 완료! 🎉
 이제 원우 사진이나 짧은 영상을 보내주시면 예쁜 앨범으로 만들어드릴게요.`;
@@ -274,8 +305,13 @@ export default async function handler(
     );
 
     // 6. 즉시 응답 (제안 B-2)
-    const albumUrl = getAlbumUrl(payload.timestamp);
-    res.status(200).json(simpleTextResponse(ACK_MESSAGE(displayName, albumUrl)));
+    //    같은 사용자가 연달아 보내면 첫 번째만 링크 포함 풀 메시지,
+    //    이후 20초 내 메시지는 짧은 ACK만 (스팸 방지)
+    const useShortAck = shouldSendShortAck(payload.userId);
+    const ackText = useShortAck
+      ? ACK_MESSAGE_SHORT(displayName)
+      : ACK_MESSAGE(displayName, getAlbumUrl(payload.timestamp));
+    res.status(200).json(simpleTextResponse(ackText));
 
     // 7. 백그라운드 처리 (Vercel waitUntil)
     waitUntil(
