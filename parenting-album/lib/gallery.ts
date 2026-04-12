@@ -115,11 +115,12 @@ function groupEntriesByWeek(
     }
   }
 
+  // 최신 주차가 위로 (내림차순), 각 주차 안 항목도 최신이 위로
   return Array.from(map.values())
-    .sort((a, b) => a.weekId.localeCompare(b.weekId))
+    .sort((a, b) => b.weekId.localeCompare(a.weekId))
     .map((g) => ({
       ...g,
-      entries: g.entries.sort((a, b) => a.date.getTime() - b.date.getTime()),
+      entries: g.entries.sort((a, b) => b.date.getTime() - a.date.getTime()),
     }));
 }
 
@@ -183,12 +184,34 @@ function renderCommentForm(entryPageId: string, users: NotionUser[]): string {
   </form>`;
 }
 
-function renderEntry(
+/** 썸네일 그리드용 — 사진 1장을 작은 타일로 렌더 */
+function renderThumbTile(entry: RawEntryRow): string {
+  if (entry.type === 'Video') {
+    const videoSrc = safeHttpsUrl(entry.webVideoUrl) ?? safeHttpsUrl(entry.mediaUrl);
+    const posterSrc = safeHttpsUrl(entry.mediaThumbUrl) ?? safeHttpsUrl(entry.mediaPrintUrl);
+    if (!videoSrc) return '';
+    return `<div class="thumb-tile" data-full="${escapeHtml(videoSrc)}" data-type="video"${posterSrc ? ` data-poster="${escapeHtml(posterSrc)}"` : ''}>
+      <img src="${escapeHtml(posterSrc ?? '')}" alt="${escapeHtml(entry.rawContent || '영상')}" loading="lazy">
+      <span class="thumb-video-badge">▶ ${entry.videoDuration ? Math.round(entry.videoDuration) + '초' : '영상'}</span>
+    </div>`;
+  }
+  if (entry.type === 'Image' || entry.type === 'Mixed') {
+    const thumbSrc = safeHttpsUrl(entry.mediaThumbUrl) ?? safeHttpsUrl(entry.mediaPrintUrl) ?? safeHttpsUrl(entry.mediaUrl);
+    const fullSrc = safeHttpsUrl(entry.mediaPrintUrl) ?? safeHttpsUrl(entry.mediaUrl);
+    if (!thumbSrc) return '';
+    return `<div class="thumb-tile" data-full="${escapeHtml(fullSrc ?? thumbSrc)}" data-type="image">
+      <img src="${escapeHtml(thumbSrc)}" alt="${escapeHtml(entry.rawContent || '사진')}" loading="lazy">
+    </div>`;
+  }
+  return '';
+}
+
+/** 개별 항목 상세 뷰 (캡션 + 메타 + 댓글) — 라이트박스 아래에 표시 */
+function renderEntryDetail(
   entry: RawEntryRow,
   comments: CommentRow[],
   users: NotionUser[],
 ): string {
-  const media = renderMediaBlock(entry);
   const caption = entry.rawContent.trim()
     ? `<p class="entry-caption">${escapeHtml(entry.rawContent)}</p>`
     : '';
@@ -201,8 +224,7 @@ function renderEntry(
     : '';
   const commentForm = renderCommentForm(entry.pageId, users);
 
-  return `<article class="entry" data-entry-id="${escapeHtml(entry.pageId)}">
-    ${media}
+  return `<div class="entry-detail" data-entry-id="${escapeHtml(entry.pageId)}" style="display:none;">
     ${caption}
     ${metadata}
     <section class="comments">
@@ -210,7 +232,7 @@ function renderEntry(
       ${commentList}
       ${commentForm}
     </section>
-  </article>`;
+  </div>`;
 }
 
 function renderWeek(
@@ -222,9 +244,6 @@ function renderWeek(
   const summary = group.summary;
   const title = summary?.weekTitle ? escapeHtml(summary.weekTitle) : escapeHtml(group.weekId);
   const essay = summary?.essay ? `<p class="week-essay">${escapeHtml(summary.essay)}</p>` : '';
-  const entries = group.entries
-    .map((e) => renderEntry(e, commentsByEntry.get(e.pageId) ?? [], users))
-    .join('');
   const photoCount = group.entries.length;
   const commentCount = group.entries.reduce(
     (sum, e) => sum + (commentsByEntry.get(e.pageId)?.length ?? 0),
@@ -244,6 +263,11 @@ function renderWeek(
         }`
       : escapeHtml(group.weekId);
 
+  const thumbs = group.entries.map(renderThumbTile).filter(Boolean).join('');
+  const details = group.entries
+    .map((e) => renderEntryDetail(e, commentsByEntry.get(e.pageId) ?? [], users))
+    .join('');
+
   return `<details class="week" ${expanded ? 'open' : ''}>
     <summary class="week-header">
       <div class="week-header-main">
@@ -257,7 +281,8 @@ function renderWeek(
     </summary>
     <div class="week-body">
       ${essay}
-      <div class="entries">${entries}</div>
+      <div class="thumb-grid">${thumbs}</div>
+      ${details}
     </div>
   </details>`;
 }
@@ -392,6 +417,59 @@ html, body {
   font-size: 15px;
   line-height: 1.8;
   white-space: pre-wrap;
+}
+
+/* ─── 썸네일 그리드 (3열) ─── */
+.thumb-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+}
+.thumb-tile {
+  position: relative;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: 6px;
+  cursor: pointer;
+  background: #eee;
+}
+.thumb-tile img {
+  width: 100%; height: 100%; object-fit: cover; display: block;
+  transition: transform 0.15s;
+}
+.thumb-tile:hover img { transform: scale(1.05); }
+.thumb-video-badge {
+  position: absolute; bottom: 4px; left: 4px;
+  background: rgba(0,0,0,.65); color: #fff; font-size: 10px;
+  padding: 2px 6px; border-radius: 4px;
+}
+
+/* ─── 라이트박스 (클릭 시 크게 보기) ─── */
+.lightbox-overlay {
+  display: none; position: fixed; inset: 0; z-index: 9999;
+  background: rgba(0,0,0,.92); flex-direction: column;
+  align-items: center; justify-content: center;
+  animation: lbFadeIn 0.2s ease-out;
+}
+.lightbox-overlay.open { display: flex; }
+@keyframes lbFadeIn { from { opacity: 0; } to { opacity: 1; } }
+.lightbox-close {
+  position: absolute; top: 16px; right: 16px;
+  background: none; border: none; color: #fff; font-size: 32px;
+  cursor: pointer; z-index: 10001; padding: 8px;
+}
+.lightbox-media {
+  max-width: 95vw; max-height: 80vh; object-fit: contain;
+  border-radius: 8px;
+}
+.lightbox-caption {
+  color: #ccc; font-size: 13px; margin-top: 12px; text-align: center;
+  max-width: 90vw;
+}
+.lightbox-detail {
+  background: var(--card); border-radius: 14px; margin-top: 12px;
+  padding: 16px 20px; max-width: 480px; width: 90vw;
+  max-height: 30vh; overflow-y: auto;
 }
 
 .entries {
@@ -551,6 +629,38 @@ html, body {
 const CLIENT_JS = `
 (function() {
   const LAST_AUTHOR_KEY = 'wonwoo-album-last-author';
+
+  // ─── 라이트박스 (썸네일 클릭 → 크게 보기) ───
+  (function initLightbox() {
+    // 오버레이 생성
+    var overlay = document.createElement('div');
+    overlay.className = 'lightbox-overlay';
+    overlay.innerHTML = '<button class="lightbox-close" aria-label="닫기">&times;</button><div id="lb-content"></div>';
+    document.body.appendChild(overlay);
+    var closeBtn = overlay.querySelector('.lightbox-close');
+    var content = document.getElementById('lb-content');
+
+    function closeLb() { overlay.classList.remove('open'); content.innerHTML = ''; }
+    closeBtn.addEventListener('click', closeLb);
+    overlay.addEventListener('click', function(e) { if (e.target === overlay) closeLb(); });
+    document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeLb(); });
+
+    // 모든 썸네일 타일에 클릭 이벤트
+    document.querySelectorAll('.thumb-tile').forEach(function(tile) {
+      tile.addEventListener('click', function() {
+        var fullUrl = tile.dataset.full;
+        var type = tile.dataset.type;
+        var html = '';
+        if (type === 'video') {
+          html = '<video class="lightbox-media" src="' + fullUrl + '" controls autoplay playsinline></video>';
+        } else {
+          html = '<img class="lightbox-media" src="' + fullUrl + '" alt="">';
+        }
+        content.innerHTML = html;
+        overlay.classList.add('open');
+      });
+    });
+  })();
 
   // 페이지 로드 시 마지막으로 사용한 이름 드롭다운 복원
   document.querySelectorAll('.comment-author-select').forEach(function(sel) {
