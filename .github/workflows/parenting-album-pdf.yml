@@ -11,11 +11,6 @@ on:
         description: '앨범 월 (예: 2026-04). 비워두면 전 달 자동 계산.'
         required: false
         type: string
-      digital_url:
-        description: '디지털 앨범 URL (뒷표지, 선택)'
-        required: false
-        default: 'https://focuskit-five.vercel.app'
-        type: string
 
 jobs:
   build-pdf:
@@ -41,7 +36,6 @@ jobs:
         run: |
           INPUT_MONTH="${{ github.event.inputs.month }}"
           if [ -z "$INPUT_MONTH" ]; then
-            # 전 달 자동 계산 (UTC 기준 현재 날짜에서 1개월 전)
             TARGET=$(date -u -d "$(date -u +%Y-%m-01) -1 month" +%Y-%m 2>/dev/null || date -u -v-1m +%Y-%m)
           else
             TARGET="$INPUT_MONTH"
@@ -65,9 +59,8 @@ jobs:
           PDF_OUTPUT_DIR: ./dist
         run: |
           MONTH="${{ steps.month.outputs.target }}"
-          DIGITAL_URL="${{ github.event.inputs.digital_url || 'https://focuskit-five.vercel.app' }}"
           echo "Building PDF for $MONTH"
-          npx tsx scripts/build-pdf.ts --month="$MONTH" --digital-url="$DIGITAL_URL/album/$MONTH"
+          npx tsx scripts/build-pdf.ts --month="$MONTH" --digital-url="https://focuskit-five.vercel.app/album/$MONTH"
 
       - name: Upload PDF artifact
         uses: actions/upload-artifact@v4
@@ -77,24 +70,12 @@ jobs:
           retention-days: 90
 
       - name: Send PDF via email
-        uses: dawidd6/action-send-mail@v3
-        with:
-          server_address: smtp.gmail.com
-          server_port: 465
-          secure: true
-          username: ${{ secrets.EMAIL_SENDER }}
-          password: ${{ secrets.EMAIL_APP_PASSWORD }}
-          subject: "📖 원우 앨범 ${{ steps.month.outputs.target }} — PDF 완성!"
-          to: ${{ secrets.EMAIL_RECIPIENTS }}
-          from: 원우 앨범봇 <${{ secrets.EMAIL_SENDER }}>
-          body: |
-            원우의 ${{ steps.month.outputs.target }} 앨범 PDF가 완성되었어요! 🎉
-
-            첨부된 PDF를 다운로드해서 확인하세요.
-            인쇄하고 싶으면 스냅스(https://www.snaps.com)에 업로드하면 돼요.
-
-            📖 디지털 앨범으로 보기:
-            https://focuskit-five.vercel.app/album/${{ steps.month.outputs.target }}
-
-            이 메일은 매월 1일 자동으로 발송됩니다 🌷
-          attachments: parenting-album/dist/wonwoo-album-${{ steps.month.outputs.target }}.pdf
+        if: ${{ env.HAS_EMAIL == 'true' }}
+        env:
+          HAS_EMAIL: ${{ secrets.EMAIL_SENDER != '' }}
+          EMAIL_SENDER: ${{ secrets.EMAIL_SENDER }}
+          EMAIL_APP_PASSWORD: ${{ secrets.EMAIL_APP_PASSWORD }}
+          EMAIL_RECIPIENTS: ${{ secrets.EMAIL_RECIPIENTS }}
+        run: |
+          MONTH="${{ steps.month.outputs.target }}"
+          npx tsx scripts/send-email.ts --month="$MONTH" --pdf="dist/wonwoo-album-${MONTH}.pdf"
