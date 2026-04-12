@@ -311,6 +311,22 @@ export async function updateUserNameAndActivate(
   cacheInvalidate(kakaoUserId);
 }
 
+/** 이미 등록된 사용자를 다시 awaiting_name 상태로 되돌려 재등록 유도 */
+export async function resetUserToAwaitingName(
+  pageId: string,
+  kakaoUserId: string,
+): Promise<void> {
+  await getClient().pages.update({
+    page_id: pageId,
+    properties: {
+      display_name: richText(''),
+      state: selectOpt('awaiting_name'),
+      last_seen: dateProp(new Date()),
+    },
+  });
+  cacheInvalidate(kakaoUserId);
+}
+
 // ────────────────────────────────────────────────────────────────
 // Raw_Entry DB
 // ────────────────────────────────────────────────────────────────
