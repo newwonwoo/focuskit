@@ -127,7 +127,7 @@ function isLikelyMediaUrl(url: string): boolean {
 export function extractPayload(req: KakaoRequest): ExtractedPayload {
   // 모든 경로를 안전하게 조회. Kakao가 null을 섞어 보내도 안전.
   const userId = req.userRequest?.user?.id ?? '';
-  const utterance = (req.userRequest?.utterance ?? '').trim();
+  const utteranceRaw = (req.userRequest?.utterance ?? '').trim();
   const messageBlockId = req.userRequest?.block?.id ?? req.action?.id ?? 'unknown';
   const timestamp = new Date();
 
@@ -136,8 +136,16 @@ export function extractPayload(req: KakaoRequest): ExtractedPayload {
   collectUrlStrings(req.action?.detailParams, urls);
   collectUrlStrings(req.action?.clientExtra, urls);
   collectUrlStrings(req.userRequest?.params, urls);
+  // utterance도 스캔 — 카카오는 이미지 전송 시 URL을 utterance에 그대로 넣는 경우가 있다.
+  collectUrlStrings(utteranceRaw, urls);
 
   const mediaUrls = Array.from(urls).filter(isLikelyMediaUrl);
+
+  // utterance에 미디어 URL이 섞여 있으면 제거하고 순수 텍스트만 남긴다.
+  let utterance = utteranceRaw;
+  for (const url of mediaUrls) {
+    utterance = utterance.split(url).join('').trim();
+  }
 
   return { userId, utterance, mediaUrls, messageBlockId, timestamp };
 }
