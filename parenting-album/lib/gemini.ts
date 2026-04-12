@@ -1,4 +1,13 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+/**
+ * Groq AI를 사용한 주간 에세이 생성.
+ *
+ * Groq는 OpenAI 호환 API를 제공하므로 별도 SDK 없이 fetch로 호출.
+ * 무료 티어: 분당 30요청, 일 14,400요청 (충분).
+ *
+ * 환경변수:
+ *   GROQ_API_KEY: https://console.groq.com/keys 에서 발급
+ *   GROQ_MODEL: 모델명 (기본: llama-3.3-70b-versatile)
+ */
 
 export interface WeekEntryInput {
   date: Date;
@@ -19,17 +28,17 @@ export interface WeekSummarizeResult {
   essay: string;
 }
 
-let clientInstance: GoogleGenerativeAI | null = null;
-function getClient(): GoogleGenerativeAI {
-  if (!clientInstance) {
-    const key = process.env.GEMINI_API_KEY;
-    if (!key) throw new Error('[gemini] GEMINI_API_KEY is not set');
-    clientInstance = new GoogleGenerativeAI(key);
-  }
-  return clientInstance;
+const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
+
+function getApiKey(): string {
+  const key = process.env.GROQ_API_KEY;
+  if (!key) throw new Error('[ai] GROQ_API_KEY is not set');
+  return key;
 }
 
-const MODEL_NAME = process.env.GEMINI_MODEL ?? 'gemini-2.0-flash-lite';
+function getModel(): string {
+  return process.env.GROQ_MODEL ?? 'llama-3.3-70b-versatile';
+}
 
 const SYSTEM_PROMPT = `당신은 24개월 아이 "원우"의 성장 기록을 다듬는 따뜻한 관찰자입니다.
 아래는 이번 주 가족들(아빠, 엄마, 조부모, 이모·삼촌 등)이 카카오톡으로 남긴 사진 캡션과
@@ -73,8 +82,7 @@ function formatEntriesForPrompt(input: WeekSummarizeInput): string {
   return lines.join('\n');
 }
 
-function parseGeminiJson(raw: string): WeekSummarizeResult {
-  // Gemini가 때때로 ```json ... ``` 코드 펜스로 감싸 반환하므로 제거.
+function parseJsonResponse(raw: string): WeekSummarizeResult {
   const cleaned = raw
     .replace(/^\s*```(?:json)?\s*/i, '')
     .replace(/\s*```\s*$/i, '')
@@ -85,19 +93,19 @@ function parseGeminiJson(raw: string): WeekSummarizeResult {
     parsed = JSON.parse(cleaned);
   } catch (err) {
     throw new Error(
-      `[gemini] failed to parse JSON response: ${(err as Error).message}\nRaw: ${raw.slice(0, 200)}`,
+      `[ai] failed to parse JSON response: ${(err as Error).message}\nRaw: ${raw.slice(0, 200)}`,
     );
   }
 
   if (typeof parsed !== 'object' || parsed === null) {
-    throw new Error('[gemini] response is not a JSON object');
+    throw new Error('[ai] response is not a JSON object');
   }
   const obj = parsed as Record<string, unknown>;
   const weekTitle = obj.week_title;
   const essay = obj.essay;
 
   if (typeof weekTitle !== 'string' || typeof essay !== 'string') {
-    throw new Error('[gemini] response missing week_title or essay');
+    throw new Error('[ai] response missing week_title or essay');
   }
   return {
     weekTitle: weekTitle.trim(),
@@ -106,7 +114,7 @@ function parseGeminiJson(raw: string): WeekSummarizeResult {
 }
 
 /**
- * 주간 데이터를 Gemini에 전송해 제목과 에세이를 받는다.
+ * 주간 데이터를 Groq에 전송해 제목과 에세이를 받는다.
  * 실패 시 지수 백오프로 최대 3회 재시도.
  */
 export async function summarizeWeek(
@@ -114,14 +122,8 @@ export async function summarizeWeek(
   options: { maxRetries?: number } = {},
 ): Promise<WeekSummarizeResult> {
   const maxRetries = options.maxRetries ?? 3;
-  const client = getClient();
-  const model = client.getGenerativeModel({
-    model: MODEL_NAME,
-    generationConfig: {
-      temperature: 0.7,
-      responseMimeType: 'application/json',
-    },
-  });
+  const apiKey = getApiKey();
+  const model = getModel();
 
   const mdStart = `${input.startDate.getUTCFullYear()}-${String(input.startDate.getUTCMonth() + 1).padStart(2, '0')}-${String(input.startDate.getUTCDate()).padStart(2, '0')}`;
   const mdEnd = `${input.endDate.getUTCFullYear()}-${String(input.endDate.getUTCMonth() + 1).padStart(2, '0')}-${String(input.endDate.getUTCDate()).padStart(2, '0')}`;
@@ -134,24 +136,46 @@ ${formatEntriesForPrompt(input)}`;
   let lastError: unknown;
   for (let attempt = 0; attempt < maxRetries; attempt += 1) {
     try {
-      const res = await model.generateContent({
-        contents: [
-          { role: 'user', parts: [{ text: `${SYSTEM_PROMPT}\n\n${userPrompt}` }] },
-        ],
+      const res = await fetch(GROQ_API_URL, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: 'system', content: SYSTEM_PROMPT },
+            { role: 'user', content: userPrompt },
+          ],
+          temperature: 0.7,
+          response_format: { type: 'json_object' },
+        }),
       });
-      const text = res.response.text();
-      return parseGeminiJson(text);
+
+      if (!res.ok) {
+        const errorBody = await res.text();
+        throw new Error(`Groq API ${res.status}: ${errorBody.slice(0, 300)}`);
+      }
+
+      const data = (await res.json()) as {
+        choices: Array<{ message: { content: string } }>;
+      };
+      const content = data.choices?.[0]?.message?.content;
+      if (!content) throw new Error('[ai] empty response from Groq');
+
+      return parseJsonResponse(content);
     } catch (err) {
       lastError = err;
       const delayMs = 2 ** attempt * 1000;
       console.warn(
-        `[gemini] attempt ${attempt + 1}/${maxRetries} failed, retrying in ${delayMs}ms`,
+        `[ai] attempt ${attempt + 1}/${maxRetries} failed, retrying in ${delayMs}ms`,
         (err as Error).message,
       );
       await new Promise((r) => setTimeout(r, delayMs));
     }
   }
   throw new Error(
-    `[gemini] exhausted ${maxRetries} retries: ${(lastError as Error)?.message ?? String(lastError)}`,
+    `[ai] exhausted ${maxRetries} retries: ${(lastError as Error)?.message ?? String(lastError)}`,
   );
 }
