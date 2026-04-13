@@ -144,7 +144,18 @@ const ESSAY_COMMANDS = new Set([
   '/이번주',
 ]);
 
-function getUploadUrl(date: Date): string | null {
+/** 모든 봇 명령어 통합 (등록 전 명령어 감지용) */
+const ALL_BOT_COMMANDS = new Set([
+  ...RENAME_COMMANDS, ...UPLOAD_COMMANDS, ...ALBUM_COMMANDS,
+  ...HELP_COMMANDS, ...STATS_COMMANDS, ...ESSAY_COMMANDS,
+]);
+
+const REGISTER_FIRST_MESSAGE = `먼저 등록이 필요해요 🌷
+
+원우와 어떤 관계이신가요?
+(예: 아빠, 엄마, 외할머니, 큰이모, 큰삼촌)
+
+등록 후에 앨범, 사진 업로드 등 모든 기능을 사용할 수 있어요!`;
   const base =
     process.env.PUBLIC_ALBUM_BASE_URL ??
     (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null);
@@ -370,6 +381,11 @@ export default async function handler(
       // 미디어가 섞여오면 등록 먼저
       if (payload.mediaUrls.length > 0) {
         res.status(200).json(simpleTextResponse(MEDIA_BEFORE_REGISTRATION));
+        return;
+      }
+      // 봇 명령어를 이름으로 등록하지 않도록 차단
+      if (ALL_BOT_COMMANDS.has(trimmedUtterance)) {
+        res.status(200).json(simpleTextResponse(REGISTER_FIRST_MESSAGE));
         return;
       }
       if (isValidDisplayName(payload.utterance)) {
