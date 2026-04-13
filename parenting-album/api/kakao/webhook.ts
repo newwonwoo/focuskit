@@ -156,6 +156,8 @@ const REGISTER_FIRST_MESSAGE = `먼저 등록이 필요해요 🌷
 (예: 아빠, 엄마, 외할머니, 큰이모, 큰삼촌)
 
 등록 후에 앨범, 사진 업로드 등 모든 기능을 사용할 수 있어요!`;
+
+function getUploadUrl(date: Date): string | null {
   const base =
     process.env.PUBLIC_ALBUM_BASE_URL ??
     (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null);
