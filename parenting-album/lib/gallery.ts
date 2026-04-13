@@ -455,22 +455,47 @@ html, body {
 .lightbox-overlay.open { display: flex; }
 @keyframes lbFadeIn { from { opacity: 0; } to { opacity: 1; } }
 .lightbox-close {
-  position: absolute; top: 16px; right: 16px;
-  background: none; border: none; color: #fff; font-size: 32px;
-  cursor: pointer; z-index: 10001; padding: 8px;
+  position: absolute; top: 12px; right: 12px;
+  background: rgba(0,0,0,.5); border: none; color: #fff; font-size: 28px;
+  cursor: pointer; z-index: 10001; padding: 6px 12px; border-radius: 50%;
+}
+.lb-nav {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  background: rgba(255,255,255,.15); border: none; color: #fff;
+  font-size: 36px; cursor: pointer; padding: 12px 16px; border-radius: 50%;
+  z-index: 10001; backdrop-filter: blur(4px);
+}
+.lb-nav:hover { background: rgba(255,255,255,.3); }
+.lb-prev { left: 12px; }
+.lb-next { right: 12px; }
+.lb-main {
+  display: flex; flex-direction: column; align-items: center;
+  max-height: 95vh; width: 100%; overflow-y: auto;
+}
+.lb-media-wrap {
+  flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+  width: 100%; max-height: 55vh; padding: 8px;
 }
 .lightbox-media {
-  max-width: 95vw; max-height: 80vh; object-fit: contain;
+  max-width: 95vw; max-height: 55vh; object-fit: contain;
   border-radius: 8px;
 }
-.lightbox-caption {
-  color: #ccc; font-size: 13px; margin-top: 12px; text-align: center;
-  max-width: 90vw;
+.lb-detail {
+  background: var(--card); border-radius: 14px 14px 0 0; margin-top: 8px;
+  padding: 16px 20px 24px; max-width: 480px; width: 95vw;
+  max-height: 38vh; overflow-y: auto;
 }
-.lightbox-detail {
-  background: var(--card); border-radius: 14px; margin-top: 12px;
-  padding: 16px 20px; max-width: 480px; width: 90vw;
-  max-height: 30vh; overflow-y: auto;
+.lb-detail .entry-caption { padding: 0; margin-bottom: 12px; }
+.lb-detail .entry-meta { padding: 0; margin-bottom: 12px; }
+.lb-detail .comments { border-top: none; padding: 0; background: transparent; }
+.lb-counter {
+  position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
+  color: rgba(255,255,255,.6); font-size: 13px; font-variant-numeric: tabular-nums;
+}
+@media (max-width: 560px) {
+  .lb-nav { font-size: 24px; padding: 8px 12px; }
+  .lb-prev { left: 4px; }
+  .lb-next { right: 4px; }
 }
 
 .entries {
@@ -631,36 +656,159 @@ const CLIENT_JS = `
 (function() {
   const LAST_AUTHOR_KEY = 'wonwoo-album-last-author';
 
-  // ─── 라이트박스 (썸네일 클릭 → 크게 보기) ───
-  (function initLightbox() {
+  // ─── 풀스크린 갤러리 뷰어 (사진 + 댓글 + 좌우 스와이프) ───
+  (function initGalleryViewer() {
+    var allTiles = Array.from(document.querySelectorAll('.thumb-tile'));
+    if (allTiles.length === 0) return;
+
     // 오버레이 생성
     var overlay = document.createElement('div');
     overlay.className = 'lightbox-overlay';
-    overlay.innerHTML = '<button class="lightbox-close" aria-label="닫기">&times;</button><div id="lb-content"></div>';
+    overlay.innerHTML = [
+      '<button class="lightbox-close" aria-label="닫기">&times;</button>',
+      '<button class="lb-nav lb-prev" aria-label="이전">‹</button>',
+      '<button class="lb-nav lb-next" aria-label="다음">›</button>',
+      '<div class="lb-main">',
+      '  <div class="lb-media-wrap" id="lb-media"></div>',
+      '  <div class="lb-detail" id="lb-detail"></div>',
+      '</div>',
+      '<div class="lb-counter" id="lb-counter"></div>',
+    ].join('');
     document.body.appendChild(overlay);
-    var closeBtn = overlay.querySelector('.lightbox-close');
-    var content = document.getElementById('lb-content');
 
-    function closeLb() { overlay.classList.remove('open'); content.innerHTML = ''; }
+    var closeBtn = overlay.querySelector('.lightbox-close');
+    var prevBtn = overlay.querySelector('.lb-prev');
+    var nextBtn = overlay.querySelector('.lb-next');
+    var mediaWrap = document.getElementById('lb-media');
+    var detailWrap = document.getElementById('lb-detail');
+    var counterEl = document.getElementById('lb-counter');
+    var currentIdx = 0;
+
+    // 해당 tile의 entry-detail 찾기
+    function findDetail(tile) {
+      var weekBody = tile.closest('.week-body');
+      if (!weekBody) return null;
+      var tiles = Array.from(weekBody.querySelectorAll('.thumb-tile'));
+      var tileIdx = tiles.indexOf(tile);
+      var details = weekBody.querySelectorAll('.entry-detail');
+      return details[tileIdx] || null;
+    }
+
+    function showSlide(idx) {
+      if (idx < 0) idx = allTiles.length - 1;
+      if (idx >= allTiles.length) idx = 0;
+      currentIdx = idx;
+      var tile = allTiles[idx];
+      var fullUrl = tile.dataset.full;
+      var type = tile.dataset.type;
+
+      // 미디어
+      if (type === 'video') {
+        mediaWrap.innerHTML = '<video class="lightbox-media" src="' + fullUrl + '" controls autoplay playsinline></video>';
+      } else {
+        mediaWrap.innerHTML = '<img class="lightbox-media" src="' + fullUrl + '" alt="">';
+      }
+
+      // 상세 (캡션 + 댓글 + 댓글 폼)
+      var detail = findDetail(tile);
+      if (detail) {
+        detailWrap.innerHTML = detail.innerHTML;
+        detailWrap.style.display = 'block';
+        // 새로 삽입된 댓글 폼에 이벤트 연결
+        bindCommentForm(detailWrap);
+        // 이름 드롭다운 복원
+        try {
+          var sel = detailWrap.querySelector('.comment-author-select');
+          var last = localStorage.getItem(LAST_AUTHOR_KEY);
+          if (sel && last) {
+            for (var o of sel.options) { if (o.value === last) { sel.value = last; break; } }
+          }
+        } catch(e) {}
+      } else {
+        detailWrap.innerHTML = '';
+        detailWrap.style.display = 'none';
+      }
+
+      counterEl.textContent = (idx + 1) + ' / ' + allTiles.length;
+      overlay.classList.add('open');
+    }
+
+    function closeLb() {
+      overlay.classList.remove('open');
+      mediaWrap.innerHTML = '';
+      detailWrap.innerHTML = '';
+    }
+
     closeBtn.addEventListener('click', closeLb);
     overlay.addEventListener('click', function(e) { if (e.target === overlay) closeLb(); });
-    document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeLb(); });
+    prevBtn.addEventListener('click', function(e) { e.stopPropagation(); showSlide(currentIdx - 1); });
+    nextBtn.addEventListener('click', function(e) { e.stopPropagation(); showSlide(currentIdx + 1); });
 
-    // 모든 썸네일 타일에 클릭 이벤트
-    document.querySelectorAll('.thumb-tile').forEach(function(tile) {
-      tile.addEventListener('click', function() {
-        var fullUrl = tile.dataset.full;
-        var type = tile.dataset.type;
-        var html = '';
-        if (type === 'video') {
-          html = '<video class="lightbox-media" src="' + fullUrl + '" controls autoplay playsinline></video>';
-        } else {
-          html = '<img class="lightbox-media" src="' + fullUrl + '" alt="">';
-        }
-        content.innerHTML = html;
-        overlay.classList.add('open');
-      });
+    document.addEventListener('keydown', function(e) {
+      if (!overlay.classList.contains('open')) return;
+      if (e.key === 'Escape') closeLb();
+      if (e.key === 'ArrowLeft') showSlide(currentIdx - 1);
+      if (e.key === 'ArrowRight') showSlide(currentIdx + 1);
     });
+
+    // 터치 스와이프
+    var touchStartX = 0;
+    overlay.addEventListener('touchstart', function(e) { touchStartX = e.touches[0].clientX; }, { passive: true });
+    overlay.addEventListener('touchend', function(e) {
+      var dx = e.changedTouches[0].clientX - touchStartX;
+      if (Math.abs(dx) > 50) {
+        if (dx > 0) showSlide(currentIdx - 1);
+        else showSlide(currentIdx + 1);
+      }
+    });
+
+    // 썸네일 클릭
+    allTiles.forEach(function(tile, i) {
+      tile.addEventListener('click', function() { showSlide(i); });
+    });
+
+    // 라이트박스 내 댓글 폼 바인딩
+    function bindCommentForm(container) {
+      var form = container.querySelector('.comment-form');
+      if (!form || form.dataset.bound) return;
+      form.dataset.bound = 'true';
+      form.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        var entryId = form.dataset.entryId;
+        var authorSel = form.querySelector('.comment-author-select');
+        var textInput = form.querySelector('input[name="text"]');
+        var button = form.querySelector('button');
+        var errorDiv = form.querySelector('.comment-form-error');
+        var authorKakaoId = authorSel.value;
+        var authorName = authorSel.options[authorSel.selectedIndex].textContent;
+        var text = textInput.value.trim();
+        errorDiv.textContent = '';
+        if (!authorKakaoId || !text) { errorDiv.textContent = '이름과 내용을 모두 입력해주세요.'; return; }
+        button.disabled = true;
+        button.textContent = '보내는 중...';
+        try {
+          var res = await fetch('/api/comment/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ momentRefId: entryId, authorKakaoUserId: authorKakaoId, authorName: authorName, text: text }),
+          });
+          if (!res.ok) { var err = await res.json().catch(function(){return {};}); throw new Error(err.error || 'HTTP ' + res.status); }
+          // 댓글 추가
+          var list = form.parentElement.querySelector('.comment-list');
+          if (!list) { list = document.createElement('ul'); list.className = 'comment-list'; form.parentElement.insertBefore(list, form); }
+          var li = document.createElement('li'); li.className = 'comment';
+          li.innerHTML = '<div class="comment-author"></div><div class="comment-text"></div><div class="comment-time">방금</div>';
+          li.querySelector('.comment-author').textContent = authorName;
+          li.querySelector('.comment-text').textContent = text;
+          list.appendChild(li);
+          var titleEl = form.parentElement.querySelector('.comments-title');
+          if (titleEl) titleEl.textContent = '댓글 ' + list.querySelectorAll('.comment').length;
+          textInput.value = '';
+          try { localStorage.setItem(LAST_AUTHOR_KEY, authorKakaoId); } catch(e) {}
+        } catch(err) { errorDiv.textContent = '등록 실패: ' + err.message; }
+        finally { button.disabled = false; button.textContent = '보내기'; }
+      });
+    }
   })();
 
   // 페이지 로드 시 마지막으로 사용한 이름 드롭다운 복원
