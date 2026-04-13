@@ -80,8 +80,8 @@ async function main(): Promise<void> {
   const albumUrl = `${opts.albumBaseUrl}/album/${opts.month}`;
 
   const transporter = nodemailer.createTransport({
-    host: process.env.EMAIL_SMTP_HOST ?? 'smtp.naver.com',
-    port: Number(process.env.EMAIL_SMTP_PORT ?? '465'),
+    host: process.env.EMAIL_SMTP_HOST || 'smtp.naver.com',
+    port: Number(process.env.EMAIL_SMTP_PORT || '465'),
     secure: true,
     auth: {
       user: sender,
