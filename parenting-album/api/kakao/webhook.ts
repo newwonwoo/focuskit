@@ -386,7 +386,7 @@ export default async function handler(
         return;
       }
       // 봇 명령어를 이름으로 등록하지 않도록 차단
-      if (ALL_BOT_COMMANDS.has(trimmedUtterance)) {
+      if (ALL_BOT_COMMANDS.has(payload.utterance.trim())) {
         res.status(200).json(simpleTextResponse(REGISTER_FIRST_MESSAGE));
         return;
       }
