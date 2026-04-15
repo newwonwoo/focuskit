@@ -21,6 +21,10 @@ export interface UploadResult {
   height?: number;
   /** 인쇄에 쓰기엔 해상도가 부족한지 (< 1500px 기준) */
   isLowResolutionForPrint?: boolean;
+  /** EXIF DateTimeOriginal (촬영 시각). 없으면 undefined — 업로드 시각으로 fallback 필요. */
+  takenAt?: Date;
+  /** 선명도 추정치 (0~100). Cloudinary가 제공하는 경우. */
+  blurScore?: number;
 }
 
 /** A5 2-up 기준으로 권장되는 최소 가로 픽셀 */
@@ -133,6 +137,8 @@ export async function uploadFromUrl(opts: UploadOptionsInput): Promise<UploadRes
     overwrite: false,
     eager: (kind === 'image' ? IMAGE_EAGER : VIDEO_EAGER) as UploadApiOptions['eager'],
     eager_async: false,
+    // EXIF 메타데이터 추출 활성화 — DateTimeOriginal 가져옴
+    image_metadata: kind === 'image',
     ...(trimTransformation ? { transformation: trimTransformation } : {}),
   };
 
@@ -164,6 +170,9 @@ export async function uploadFromUrl(opts: UploadOptionsInput): Promise<UploadRes
       );
     }
 
+    // EXIF DateTimeOriginal 파싱
+    const takenAt = parseExifDate(result);
+
     return {
       kind: 'image',
       publicId: result.public_id,
@@ -173,6 +182,7 @@ export async function uploadFromUrl(opts: UploadOptionsInput): Promise<UploadRes
       width,
       height,
       isLowResolutionForPrint,
+      takenAt,
     };
   }
 
@@ -185,4 +195,41 @@ export async function uploadFromUrl(opts: UploadOptionsInput): Promise<UploadRes
     thumbUrl: secureUrl(2) ?? result.secure_url,
     durationSeconds: typeof result.duration === 'number' ? result.duration : undefined,
   };
+}
+
+// ────────────────────────────────────────────────────────────────
+// EXIF 파싱 — Cloudinary image_metadata에서 촬영 시각 추출
+// ────────────────────────────────────────────────────────────────
+
+/**
+ * EXIF DateTimeOriginal 등을 Date로 파싱.
+ * EXIF 형식: "YYYY:MM:DD HH:MM:SS" (콜론 구분)
+ * - DateTimeOriginal 우선 (촬영 시각)
+ * - DateTime fallback (수정/생성 시각)
+ * - DateTimeDigitized fallback (디지털화 시각)
+ * 파싱 실패 시 undefined.
+ */
+export function parseExifDate(result: UploadApiResponse): Date | undefined {
+  // Cloudinary는 image_metadata: true 설정 시 result.image_metadata 필드에 EXIF를 넣어줌
+  const meta = (result as unknown as { image_metadata?: Record<string, string> }).image_metadata;
+  if (!meta || typeof meta !== 'object') return undefined;
+
+  const candidates = [
+    meta.DateTimeOriginal,
+    meta.DateTime,
+    meta.DateTimeDigitized,
+  ];
+
+  for (const raw of candidates) {
+    if (typeof raw !== 'string' || raw.trim() === '') continue;
+    // EXIF "YYYY:MM:DD HH:MM:SS" → ISO "YYYY-MM-DDTHH:MM:SS"
+    const match = /^(\d{4}):(\d{2}):(\d{2})\s+(\d{2}):(\d{2}):(\d{2})/.exec(raw.trim());
+    if (!match) continue;
+    const [, y, mo, d, h, mi, s] = match;
+    // Asia/Seoul로 가정 (카카오톡은 한국 사용자 기준, 카메라 로컬 시각)
+    const iso = `${y}-${mo}-${d}T${h}:${mi}:${s}+09:00`;
+    const parsed = new Date(iso);
+    if (!Number.isNaN(parsed.getTime())) return parsed;
+  }
+  return undefined;
 }

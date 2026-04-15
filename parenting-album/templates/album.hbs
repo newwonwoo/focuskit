@@ -114,7 +114,77 @@
     white-space: pre-wrap;
   }
 
-  /* ─────── 사진 페이지 (1장/페이지, 풀 사이즈) ─────── */
+  /* ─────── 표지 사진 ─────── */
+  .cover-photo-wrap {
+    width: 100mm;
+    height: 120mm;
+    margin: 10mm 0;
+    overflow: hidden;
+    border-radius: 2mm;
+    box-shadow: 0 4mm 12mm rgba(0,0,0,0.15);
+  }
+  .cover-photo-wrap img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  /* ─────── 월 소개 페이지 ─────── */
+  .intro-page {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 30mm 14mm;
+    background: #fdfaf1;
+  }
+  .intro-label {
+    font-family: 'Pretendard Variable', sans-serif;
+    font-size: 10pt;
+    color: #8a7d5f;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    margin-bottom: 8mm;
+  }
+  .intro-headline {
+    font-family: 'Gaegu', cursive;
+    font-size: 42pt;
+    font-weight: 700;
+    color: #2a2113;
+    margin-bottom: 12mm;
+    line-height: 1.2;
+  }
+  .intro-stats {
+    display: flex;
+    gap: 8mm;
+    margin-bottom: 10mm;
+  }
+  .intro-stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .intro-stat-num {
+    font-family: 'Gowun Batang', serif;
+    font-size: 28pt;
+    font-weight: 700;
+    color: #8a5e2f;
+  }
+  .intro-stat-label {
+    font-family: 'Pretendard Variable', sans-serif;
+    font-size: 10pt;
+    color: #786f60;
+    margin-top: 1mm;
+  }
+  .intro-dates {
+    font-family: 'Pretendard Variable', sans-serif;
+    font-size: 11pt;
+    color: #5c4e35;
+  }
+
+  /* ─────── 사진 페이지 공통 ─────── */
   .photo-page {
     display: flex;
     flex-direction: column;
@@ -126,11 +196,13 @@
     display: flex;
     flex-direction: column;
     min-height: 0;
+    position: relative;
   }
   .photo-frame {
     flex: 1;
     overflow: hidden;
     min-height: 0;
+    background: #f0ebe0;
   }
   .photo-frame img {
     width: 100%;
@@ -142,7 +214,7 @@
     font-family: 'Pretendard Variable', sans-serif;
     font-size: 8pt;
     color: #5c4e35;
-    padding: 3mm 5mm;
+    padding: 2mm 4mm;
     background: #fdfaf1;
   }
   .photo-caption .author {
@@ -154,6 +226,114 @@
     margin-top: 0.5mm;
     font-style: italic;
     color: #332b1c;
+  }
+
+  /* ─────── T1: 풀블리드 1장 (기본, 가장 인상적) ─────── */
+  .page.t1 .photo-frame { padding: 0; }
+
+  /* ─────── T2: 사진 + 캡션형 (하단 캡션 크게) ─────── */
+  .page.t2 .photo-frame {
+    height: 160mm;
+    flex: none;
+  }
+  .page.t2 .t2-caption {
+    padding: 14mm 12mm;
+    background: #fdfaf1;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  .page.t2 .t2-caption .content {
+    font-family: 'Gowun Batang', serif;
+    font-size: 14pt;
+    line-height: 1.8;
+    color: #2a2113;
+    font-style: italic;
+    white-space: pre-wrap;
+  }
+  .page.t2 .t2-caption .meta {
+    font-family: 'Pretendard Variable', sans-serif;
+    font-size: 9pt;
+    color: #8a7d5f;
+    margin-top: 6mm;
+  }
+  .page.t2 .t2-caption .meta .author {
+    font-weight: 600;
+    color: #8a5e2f;
+  }
+
+  /* ─────── T3: 2장 균등 ─────── */
+  .page.t3 {
+    display: grid;
+    grid-template-rows: 1fr 1fr;
+    gap: 2mm;
+    padding: 2mm;
+    background: #fff;
+  }
+  .page.t3 .photo-slot { padding: 0; }
+
+  /* ─────── T4: 3장 혼합 (상단 1 크게 + 하단 2 작게) ─────── */
+  .page.t4 {
+    display: grid;
+    grid-template-rows: 2fr 1fr;
+    grid-template-columns: 1fr 1fr;
+    gap: 2mm;
+    padding: 2mm;
+    background: #fff;
+  }
+  .page.t4 .photo-slot:nth-child(1) {
+    grid-column: 1 / -1;
+  }
+
+  /* ─────── T5: 4장 그리드 ─────── */
+  .page.t5 {
+    display: grid;
+    grid-template-rows: 1fr 1fr;
+    grid-template-columns: 1fr 1fr;
+    gap: 2mm;
+    padding: 2mm;
+    background: #fff;
+  }
+
+  /* ─────── 회고 페이지 ─────── */
+  .retro-page {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 15mm 12mm;
+    background: linear-gradient(170deg, #f5ecd6 0%, #fdfaf1 100%);
+    text-align: center;
+  }
+  .retro-hero {
+    width: 100%;
+    max-width: 110mm;
+    height: 80mm;
+    overflow: hidden;
+    border-radius: 3mm;
+    margin-bottom: 8mm;
+    box-shadow: 0 3mm 10mm rgba(0,0,0,0.12);
+  }
+  .retro-hero img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .retro-headline {
+    font-family: 'Gaegu', cursive;
+    font-size: 28pt;
+    color: #2a2113;
+    margin-bottom: 6mm;
+    font-weight: 700;
+  }
+  .retro-summary {
+    font-family: 'Gowun Batang', serif;
+    font-size: 11pt;
+    color: #332b1c;
+    line-height: 1.9;
+    max-width: 110mm;
+    white-space: pre-wrap;
   }
 
   /* ─────── 뒷표지 ─────── */
@@ -186,9 +366,34 @@
 <!-- 표지 -->
 <section class="page cover">
   <h1 class="cover-title">{{cover.title}}</h1>
-  <div class="cover-ornament"></div>
+  {{#if cover.coverPhotoUrl}}
+    <div class="cover-photo-wrap">
+      <img src="{{cover.coverPhotoUrl}}" alt="표지">
+    </div>
+  {{else}}
+    <div class="cover-ornament"></div>
+  {{/if}}
   <p class="cover-subtitle">{{cover.subtitle}}</p>
   <p class="cover-date">{{cover.dateLabel}}</p>
+</section>
+
+<!-- 월 소개 페이지 -->
+<section class="page intro-page">
+  <p class="intro-label">{{cover.dateLabel}}</p>
+  {{#if intro.headline}}
+    <h2 class="intro-headline">{{intro.headline}}</h2>
+  {{/if}}
+  <div class="intro-stats">
+    <div class="intro-stat">
+      <span class="intro-stat-num">{{intro.totalPhotos}}</span>
+      <span class="intro-stat-label">사진</span>
+    </div>
+    <div class="intro-stat">
+      <span class="intro-stat-num">{{intro.totalComments}}</span>
+      <span class="intro-stat-label">댓글</span>
+    </div>
+  </div>
+  <p class="intro-dates">{{intro.firstDate}} ~ {{intro.lastDate}}</p>
 </section>
 
 {{#each weeks}}
@@ -201,27 +406,91 @@
   </section>
   {{/if}}
 
-  <!-- 사진 페이지들 -->
+  <!-- 사진 페이지 (템플릿별 분기) -->
   {{#each this.photoPages}}
-    <section class="page photo-page">
-      {{#each this.slots}}
-        <div class="photo-slot">
+    {{#if (eq this.template 'T2')}}
+      {{!-- T2: 사진 + 큰 캡션 --}}
+      <section class="page photo-page t2">
+        {{#with (lookup this.slots 0)}}
           <div class="photo-frame">
             <img src="{{this.imageUrl}}" alt="{{this.alt}}">
           </div>
-          <div class="photo-caption">
-            <span class="author">{{this.author}}</span>
-            &nbsp;·&nbsp;
-            <span>{{this.dateLabel}}</span>
-            {{#if this.content}}
-              <span class="content">"{{this.content}}"</span>
-            {{/if}}
+          <div class="t2-caption">
+            {{#if this.content}}<div class="content">{{this.content}}</div>{{/if}}
+            <div class="meta"><span class="author">{{this.author}}</span> · {{this.dateLabel}}</div>
           </div>
-        </div>
-      {{/each}}
-    </section>
+        {{/with}}
+      </section>
+    {{else if (eq this.template 'T3')}}
+      {{!-- T3: 2장 균등 --}}
+      <section class="page t3">
+        {{#each this.slots}}
+          <div class="photo-slot">
+            <div class="photo-frame">
+              <img src="{{this.imageUrl}}" alt="{{this.alt}}">
+            </div>
+          </div>
+        {{/each}}
+      </section>
+    {{else if (eq this.template 'T4')}}
+      {{!-- T4: 3장 혼합 (상단 1 + 하단 2) --}}
+      <section class="page t4">
+        {{#each this.slots}}
+          <div class="photo-slot">
+            <div class="photo-frame">
+              <img src="{{this.imageUrl}}" alt="{{this.alt}}">
+            </div>
+          </div>
+        {{/each}}
+      </section>
+    {{else if (eq this.template 'T5')}}
+      {{!-- T5: 4장 그리드 --}}
+      <section class="page t5">
+        {{#each this.slots}}
+          <div class="photo-slot">
+            <div class="photo-frame">
+              <img src="{{this.imageUrl}}" alt="{{this.alt}}">
+            </div>
+          </div>
+        {{/each}}
+      </section>
+    {{else}}
+      {{!-- T1 기본: 풀블리드 1장 --}}
+      <section class="page photo-page t1">
+        {{#with (lookup this.slots 0)}}
+          <div class="photo-slot">
+            <div class="photo-frame">
+              <img src="{{this.imageUrl}}" alt="{{this.alt}}">
+            </div>
+            <div class="photo-caption">
+              <span class="author">{{this.author}}</span>
+              &nbsp;·&nbsp;
+              <span>{{this.dateLabel}}</span>
+              {{#if this.content}}
+                <span class="content">"{{this.content}}"</span>
+              {{/if}}
+            </div>
+          </div>
+        {{/with}}
+      </section>
+    {{/if}}
   {{/each}}
 {{/each}}
+
+<!-- 회고 페이지 -->
+<section class="page retro-page">
+  {{#if retrospect.heroPhotoUrl}}
+    <div class="retro-hero">
+      <img src="{{retrospect.heroPhotoUrl}}" alt="회고">
+    </div>
+  {{/if}}
+  {{#if retrospect.headline}}
+    <h2 class="retro-headline">{{retrospect.headline}}</h2>
+  {{/if}}
+  {{#if retrospect.summary}}
+    <p class="retro-summary">{{retrospect.summary}}</p>
+  {{/if}}
+</section>
 
 <!-- 뒷표지 -->
 <section class="page back-cover">

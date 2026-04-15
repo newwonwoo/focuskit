@@ -28,6 +28,12 @@ export interface CreateRawEntryInput {
   author: string;
   authorKakaoUserId: string;
   media?: UploadResult;
+  /** EXIF 촬영 시각. 없으면 Date(수신 시각)로 fallback. */
+  takenDate?: Date;
+  /** 사진 가로 픽셀 (점수 계산용) */
+  mediaWidth?: number;
+  /** 사진 세로 픽셀 */
+  mediaHeight?: number;
 }
 
 export interface RawEntryRow {
@@ -44,6 +50,14 @@ export interface RawEntryRow {
   webVideoUrl?: string;
   videoDuration?: number;
   status: RawEntryStatus;
+  // v2 추가 필드
+  takenDate?: Date;
+  mediaWidth?: number;
+  mediaHeight?: number;
+  isHidden?: boolean;
+  qualityScore?: number;
+  excludeCode?: string;
+  clusterId?: string;
 }
 
 export interface CommentRow {
@@ -210,6 +224,12 @@ function readUrl(page: PageObjectResponse, propName: string): string | undefined
   return prop.url ?? undefined;
 }
 
+function readCheckbox(page: PageObjectResponse, propName: string): boolean | undefined {
+  const prop = page.properties[propName];
+  if (prop?.type !== 'checkbox') return undefined;
+  return prop.checkbox ?? undefined;
+}
+
 function readNumber(page: PageObjectResponse, propName: string): number | undefined {
   const prop = page.properties[propName];
   if (prop?.type !== 'number') return undefined;
@@ -368,6 +388,16 @@ export async function createRawEntry(input: CreateRawEntryInput): Promise<string
     }
   }
 
+  // v2: 촬영 시각 + 해상도 (있을 때만)
+  const takenDate = input.takenDate ?? input.media?.takenAt;
+  if (takenDate) {
+    properties.Taken_Date = dateProp(takenDate);
+  }
+  const width = input.mediaWidth ?? input.media?.width;
+  const height = input.mediaHeight ?? input.media?.height;
+  if (typeof width === 'number') properties.Media_Width = numberProp(width);
+  if (typeof height === 'number') properties.Media_Height = numberProp(height);
+
   const res = await getClient().pages.create({
     parent: { database_id: dbId },
     // Notion SDK의 properties 타입은 매우 엄격하므로 런타임에서 검증된 값을 unknown 캐스팅.
@@ -405,6 +435,14 @@ function pageToRawEntry(page: PageObjectResponse): RawEntryRow {
     webVideoUrl: readUrl(page, 'Web_Video_URL'),
     videoDuration: readNumber(page, 'Video_Duration'),
     status: normalizeRawEntryStatus(readStatusName(page, 'Status')),
+    // v2 필드 (Notion DB에 컬럼 없으면 전부 undefined)
+    takenDate: readDate(page, 'Taken_Date') ?? undefined,
+    mediaWidth: readNumber(page, 'Media_Width'),
+    mediaHeight: readNumber(page, 'Media_Height'),
+    isHidden: readCheckbox(page, 'is_hidden'),
+    qualityScore: readNumber(page, 'quality_score'),
+    excludeCode: readRichText(page, 'exclude_code') || undefined,
+    clusterId: readRichText(page, 'cluster_id') || undefined,
   };
 }
 
@@ -472,6 +510,60 @@ export async function queryRawEntriesByMonth(
   const from = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0));
   const to = new Date(Date.UTC(year, month, 0, 23, 59, 59));
   return queryRawEntriesInRange({ fromDate: from, toDate: to, status });
+}
+
+// ────────────────────────────────────────────────────────────────
+// v2 — 점수/군집/촬영시각 업데이트
+// ────────────────────────────────────────────────────────────────
+
+export interface PhotoScoringUpdate {
+  qualityScore?: number;
+  clusterId?: string | null;
+  excludeCode?: string | null;
+}
+
+export async function updatePhotoScoring(
+  pageId: string,
+  update: PhotoScoringUpdate,
+): Promise<void> {
+  const properties: Record<string, unknown> = {};
+  if (typeof update.qualityScore === 'number') {
+    properties.quality_score = numberProp(update.qualityScore);
+  }
+  if (update.clusterId !== undefined) {
+    properties.cluster_id = richText(update.clusterId ?? '');
+  }
+  if (update.excludeCode !== undefined) {
+    properties.exclude_code = richText(update.excludeCode ?? '');
+  }
+  if (Object.keys(properties).length === 0) return;
+  await getClient().pages.update({
+    page_id: pageId,
+    properties: properties as never,
+  });
+}
+
+export async function updateTakenDate(pageId: string, takenDate: Date): Promise<void> {
+  await getClient().pages.update({
+    page_id: pageId,
+    properties: {
+      Taken_Date: dateProp(takenDate),
+    } as never,
+  });
+}
+
+export async function updateMediaDimensions(
+  pageId: string,
+  width: number,
+  height: number,
+): Promise<void> {
+  await getClient().pages.update({
+    page_id: pageId,
+    properties: {
+      Media_Width: numberProp(width),
+      Media_Height: numberProp(height),
+    } as never,
+  });
 }
 
 export async function updateEntriesStatus(

@@ -59,9 +59,16 @@ export default async function handler(
         listActiveUsers(),
       ]);
 
-    const entries = [...entriesDraft, ...entriesSummarized, ...entriesPrinted].sort(
-      (a, b) => a.date.getTime() - b.date.getTime(),
-    );
+    // v2 필터: is_hidden=true 인 사진 제외
+    // (excludeCode는 디지털 앨범에서는 표시 유지 — PDF에서만 제외)
+    const entries = [...entriesDraft, ...entriesSummarized, ...entriesPrinted]
+      .filter((e) => !e.isHidden)
+      .sort((a, b) => {
+        // v2: 촬영 시각 우선, 없으면 업로드 시각
+        const da = (a.takenDate ?? a.date).getTime();
+        const db = (b.takenDate ?? b.date).getTime();
+        return da - db;
+      });
     const commentsByEntry = await listCommentsForEntries(entries.map((e) => e.pageId));
 
     const html = renderGallery({

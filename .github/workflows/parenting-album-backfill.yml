@@ -1,0 +1,52 @@
+name: parenting-album / backfill EXIF + dimensions
+
+on:
+  workflow_dispatch:
+    inputs:
+      month:
+        description: '대상 월 (예: 2026-04). --all 쓰려면 all 입력.'
+        required: false
+        type: string
+      dry_run:
+        description: 'dry-run 모드'
+        required: false
+        default: 'false'
+        type: boolean
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: parenting-album
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: parenting-album/package-lock.json
+      - run: npm ci
+      - name: Backfill Taken_Date + dimensions
+        env:
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          NOTION_DB_RAW_ID: ${{ secrets.NOTION_DB_RAW_ID }}
+          NOTION_DB_USERS_ID: ${{ secrets.NOTION_DB_USERS_ID }}
+          NOTION_DB_WEEKLY_ID: ${{ secrets.NOTION_DB_WEEKLY_ID }}
+          NOTION_DB_COMMENTS_ID: ${{ secrets.NOTION_DB_COMMENTS_ID }}
+          CLOUDINARY_CLOUD_NAME: ${{ secrets.CLOUDINARY_CLOUD_NAME }}
+          CLOUDINARY_API_KEY: ${{ secrets.CLOUDINARY_API_KEY }}
+          CLOUDINARY_API_SECRET: ${{ secrets.CLOUDINARY_API_SECRET }}
+        run: |
+          MONTH="${{ github.event.inputs.month }}"
+          if [ "$MONTH" = "all" ] || [ -z "$MONTH" ]; then
+            ARGS="--all"
+          else
+            ARGS="--month=$MONTH"
+          fi
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            ARGS="$ARGS --dry-run"
+          fi
+          npx tsx scripts/backfill-taken-date.ts $ARGS

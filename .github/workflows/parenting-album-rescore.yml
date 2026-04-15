@@ -1,0 +1,54 @@
+name: parenting-album / rescore photos
+
+on:
+  workflow_dispatch:
+    inputs:
+      month:
+        description: '점수 재계산할 월 (예: 2026-04). 비워두면 이번 달.'
+        required: false
+        type: string
+      dry_run:
+        description: 'dry-run 모드 (Notion 쓰기 없음)'
+        required: false
+        default: 'false'
+        type: boolean
+
+jobs:
+  rescore:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: parenting-album
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: parenting-album/package-lock.json
+      - run: npm ci
+      - name: Compute target month
+        id: month
+        run: |
+          INPUT="${{ github.event.inputs.month }}"
+          if [ -z "$INPUT" ]; then
+            TARGET=$(date -u +%Y-%m)
+          else
+            TARGET="$INPUT"
+          fi
+          echo "target=$TARGET" >> "$GITHUB_OUTPUT"
+      - name: Rescore + cluster
+        env:
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          NOTION_DB_RAW_ID: ${{ secrets.NOTION_DB_RAW_ID }}
+          NOTION_DB_USERS_ID: ${{ secrets.NOTION_DB_USERS_ID }}
+          NOTION_DB_WEEKLY_ID: ${{ secrets.NOTION_DB_WEEKLY_ID }}
+          NOTION_DB_COMMENTS_ID: ${{ secrets.NOTION_DB_COMMENTS_ID }}
+        run: |
+          ARGS="--month=${{ steps.month.outputs.target }}"
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            ARGS="$ARGS --dry-run"
+          fi
+          npx tsx scripts/rescore-photos.ts $ARGS

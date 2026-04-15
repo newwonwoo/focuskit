@@ -15,7 +15,9 @@
     "build:pdf": "tsx scripts/build-pdf.ts",
     "build:pdf:cmyk": "tsx scripts/build-pdf.ts && tsx scripts/convert-cmyk.ts",
     "build:hardcover": "tsx scripts/build-hardcover.ts",
-    "archive": "tsx scripts/archive-originals.ts"
+    "archive": "tsx scripts/archive-originals.ts",
+    "rescore": "tsx scripts/rescore-photos.ts",
+    "backfill": "tsx scripts/backfill-taken-date.ts"
   },
   "dependencies": {
     "@notionhq/client": "^2.2.15",
