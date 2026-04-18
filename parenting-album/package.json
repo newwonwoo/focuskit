@@ -17,7 +17,9 @@
     "build:hardcover": "tsx scripts/build-hardcover.ts",
     "archive": "tsx scripts/archive-originals.ts",
     "rescore": "tsx scripts/rescore-photos.ts",
-    "backfill": "tsx scripts/backfill-taken-date.ts"
+    "backfill": "tsx scripts/backfill-taken-date.ts",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@notionhq/client": "^2.2.15",
@@ -34,6 +36,7 @@
     "@vercel/node": "^3.2.0",
     "dotenv": "^16.4.5",
     "tsx": "^4.19.0",
-    "typescript": "^5.5.0"
+    "typescript": "^5.5.0",
+    "vitest": "^4.1.4"
   }
 }

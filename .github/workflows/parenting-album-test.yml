@@ -1,0 +1,39 @@
+name: parenting-album / test
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'parenting-album/**'
+      - '.github/workflows/parenting-album-test.yml'
+  pull_request:
+    paths:
+      - 'parenting-album/**'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: parenting-album
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: parenting-album/package-lock.json
+
+      - name: Install deps
+        run: npm ci
+
+      - name: TypeScript check
+        run: npm run typecheck
+
+      - name: Run tests
+        run: npm test
