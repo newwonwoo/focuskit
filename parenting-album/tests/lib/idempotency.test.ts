@@ -41,4 +41,16 @@ describe('generateIdempotencyKey', () => {
     const k = generateIdempotencyKey('u1', 1000, 'test');
     expect(k).toMatch(/^[0-9a-f]{16}$/);
   });
+
+  it('mediaSignature 생략 시 기본값 빈 문자열 → 결정론적', () => {
+    const withEmpty = generateIdempotencyKey('u1', 1000, 'hi', '');
+    const withDefault = generateIdempotencyKey('u1', 1000, 'hi');
+    expect(withEmpty).toBe(withDefault);
+  });
+
+  it('빈 utterance와 공백 utterance는 다른 키', () => {
+    const k1 = generateIdempotencyKey('u1', 1000, '');
+    const k2 = generateIdempotencyKey('u1', 1000, ' ');
+    expect(k1).not.toBe(k2);
+  });
 });
